@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        h1 { color: #333; margin-bottom: 20px; }
+        .progress { background: #ddd; height: 10px; border-radius: 3px; margin: 20px 0; overflow: hidden; }
+        .progress-bar { background: #667eea; height: 100%; width: 0%; transition: width 0.3s; }
+        .question-number { color: #999; font-size: 14px; }
+        .question-text { font-size: 22px; font-weight: bold; color: #333; margin: 20px 0; }
+        .question-image { width: 100%; max-width: 400px; height: 250px; object-fit: cover; border-radius: 8px; margin: 15px 0; }
+        .speed-challenge {
+            background: #f7f9ff;
+            border: 2px solid #dce3ff;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 14px 0 8px;
+        }
+        .speed-title {
+            font-weight: bold;
+            color: #3b4da1;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .speed-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .speed-canvas {
+            width: 120px;
+            height: 120px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            background: #fff;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        .speed-status {
+            font-size: 14px;
+            color: #333;
+            min-width: 210px;
+        }
+        .speed-status.done {
+            color: #1f7a3f;
+            font-weight: bold;
+        }
+        .options { margin: 20px 0; }
+        .option-label { 
+            display: block; 
+            padding: 15px; 
+            margin: 10px 0; 
+            background: #f9f9f9; 
+            border: 2px solid #ddd;
+            border-radius: 5px; 
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .option-label:hover { background: #e8f4f8; border-color: #667eea; }
+        .option-label input { margin-right: 10px; }
+        .host-reaction {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+        .host-reaction.correct {
+            background: #e8f9ee;
+            color: #1f7a3f;
+            border: 1px solid #bde5c8;
+        }
+        .host-reaction.wrong {
+            background: #fdecec;
+            color: #a12626;
+            border: 1px solid #f5b5b5;
+        }
+        .btn { 
+            padding: 12px 30px; 
+            margin: 10px 5px; 
+            font-size: 16px; 
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .btn:hover { background: #764ba2; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Quiz</h1>
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        
+        <form action="/submit" method="POST">
+            {% for q in questions %}
+                {% set question_index = loop.index0 %}
+                <div style="display: none;" id="q{{ question_index }}-container">
+                    <p class="question-number">Question {{ loop.index }} of {{ questions|length }}</p>
+                    <p class="question-text">{{ q.question }}</p>
+                    {% if q.image %}
+                        <img src="{{ q.image }}" alt="Question image" class="question-image" onerror="this.style.display='none'">
+                    {% endif %}
+                    <div class="speed-challenge">
+                        <div class="speed-title">⏱️ How quickly can you color in the square?</div>
+                        <div class="speed-wrap">
+                            <canvas class="speed-canvas" id="speedCanvas{{ question_index }}" width="120" height="120"></canvas>
+                            <div class="speed-status" id="speedStatus{{ question_index }}">Start coloring now...</div>
+                        </div>
+                    </div>
+                    <div class="options">
+                        {% for opt in q.options %}
+                        <label class="option-label">
+                            <input type="radio" name="q{{ question_index }}" value="{{ opt }}" required onchange="handleAnswer({{ question_index }}, this.value)">
+                            {{ opt }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <div class="host-reaction" id="reaction{{ question_index }}"></div>
+                </div>
+            {% endfor %}
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button type="submit" class="btn" id="submitBtn" style="display: none;">Submit Quiz</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let currentQuestion = 0;
+        const totalQuestions = {{ questions|length }};
+        const questionsData = {{ questions | tojson }};
+        let speedCtx = null;
+        let speedCanvas = null;
+        let speedChallengeStart = 0;
+        let speedChallengeActive = false;
+        let isDrawing = false;
+        let lastDrawPoint = null;
+        const speedBrushRadius = 28;
+        const speedFillTarget = 0.65;
+        const correctReactions = [
+            "Nice one! Host approves. ✅",
+            "Brilliant answer! 🎉",
+            "Spot on — keep it going! 🙌",
+            "You nailed that one! ⭐"
+        ];
+        const wrongReactions = [
+            "Not quite — next one is yours! 💪",
+            "Close, but no cigar this time! 🤏",
+            "Wrong answer — shake it off! 🔄",
+            "Host says: you’ve got this, keep going! 🚀"
+        ];
+
+        function updateProgress() {
+            const progress = ((currentQuestion + 1) / totalQuestions) * 100;
+            document.getElementById("progressBar").style.width = progress + "%";
+        }
+
+        function showQuestion(index) {
+            document.querySelectorAll('[id$="-container"]').forEach(el => el.style.display = 'none');
+            document.getElementById(`q${index}-container`).style.display = 'block';
+            initSpeedChallenge(index);
+            updateProgress();
+        }
+
+        function initSpeedChallenge(questionIndex) {
+            speedCanvas = document.getElementById(`speedCanvas${questionIndex}`);
+            speedCtx = speedCanvas.getContext("2d");
+
+            speedCanvas.onmousedown = startDraw;
+            speedCanvas.onmousemove = drawOnCanvas;
+            speedCanvas.onmouseup = stopDraw;
+            speedCanvas.onmouseleave = stopDraw;
+
+            speedCanvas.ontouchstart = startDraw;
+            speedCanvas.ontouchmove = drawOnCanvas;
+            speedCanvas.ontouchend = stopDraw;
+
+            resetSpeedChallenge(questionIndex);
+        }
+
+        function resetSpeedChallenge(questionIndex) {
+            if (!speedCtx || !speedCanvas) return;
+            speedCtx.clearRect(0, 0, speedCanvas.width, speedCanvas.height);
+            speedCtx.fillStyle = "#ffffff";
+            speedCtx.fillRect(0, 0, speedCanvas.width, speedCanvas.height);
+
+            speedChallengeStart = performance.now();
+            speedChallengeActive = true;
+            isDrawing = false;
+            lastDrawPoint = null;
+
+            const status = document.getElementById(`speedStatus${questionIndex}`);
+            status.textContent = "Start coloring now...";
+            status.className = "speed-status";
+        }
+
+        function getCanvasPoint(event) {
+            const rect = speedCanvas.getBoundingClientRect();
+            const pointer = event.touches ? event.touches[0] : event;
+            return {
+                x: (pointer.clientX - rect.left) * (speedCanvas.width / rect.width),
+                y: (pointer.clientY - rect.top) * (speedCanvas.height / rect.height)
+            };
+        }
+
+        function startDraw(event) {
+            if (!speedChallengeActive) return;
+            event.preventDefault();
+            isDrawing = true;
+            const point = getCanvasPoint(event);
+            lastDrawPoint = point;
+            drawOnCanvas(event);
+        }
+
+        function stopDraw(event) {
+            if (!speedChallengeActive) return;
+            if (event) event.preventDefault();
+            isDrawing = false;
+            lastDrawPoint = null;
+        }
+
+        function drawOnCanvas(event) {
+            if (!speedChallengeActive || !isDrawing || !speedCtx) return;
+            event.preventDefault();
+
+            const point = getCanvasPoint(event);
+            speedCtx.fillStyle = "#667eea";
+            speedCtx.strokeStyle = "#667eea";
+            speedCtx.lineWidth = speedBrushRadius * 2;
+            speedCtx.lineCap = "round";
+
+            if (lastDrawPoint) {
+                speedCtx.beginPath();
+                speedCtx.moveTo(lastDrawPoint.x, lastDrawPoint.y);
+                speedCtx.lineTo(point.x, point.y);
+                speedCtx.stroke();
+            }
+
+            speedCtx.beginPath();
+            speedCtx.arc(point.x, point.y, speedBrushRadius, 0, Math.PI * 2);
+            speedCtx.fill();
+            lastDrawPoint = point;
+
+            checkSpeedChallengeComplete(currentQuestion);
+        }
+
+        function checkSpeedChallengeComplete(questionIndex) {
+            const pixels = speedCtx.getImageData(0, 0, speedCanvas.width, speedCanvas.height).data;
+            let filled = 0;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i] < 245 || pixels[i + 1] < 245 || pixels[i + 2] < 245) {
+                    filled++;
+                }
+            }
+
+            const total = speedCanvas.width * speedCanvas.height;
+            const percent = filled / total;
+
+            if (percent >= speedFillTarget) {
+                speedChallengeActive = false;
+                const seconds = ((performance.now() - speedChallengeStart) / 1000).toFixed(2);
+                const status = document.getElementById(`speedStatus${questionIndex}`);
+                status.textContent = `Completed in ${seconds}s! Nice speed!`;
+                status.className = "speed-status done";
+            }
+        }
+
+        function getRandomReaction(isCorrect) {
+            const source = isCorrect ? correctReactions : wrongReactions;
+            return source[Math.floor(Math.random() * source.length)];
+        }
+
+        function handleAnswer(questionIndex, selectedAnswer) {
+            const reactionEl = document.getElementById(`reaction${questionIndex}`);
+            const isCorrect = selectedAnswer === questionsData[questionIndex].answer;
+
+            reactionEl.textContent = getRandomReaction(isCorrect);
+            reactionEl.className = `host-reaction ${isCorrect ? 'correct' : 'wrong'}`;
+            reactionEl.style.display = 'block';
+
+            const questionContainer = document.getElementById(`q${questionIndex}-container`);
+            questionContainer.querySelectorAll('input[type="radio"]').forEach((radio) => {
+                radio.disabled = true;
+            });
+
+            setTimeout(() => {
+                nextQuestion(questionIndex);
+            }, 900);
+        }
+
+        function nextQuestion(questionIndex) {
+            if (questionIndex + 1 < totalQuestions) {
+                currentQuestion = questionIndex + 1;
+                showQuestion(currentQuestion);
+            } else {
+                document.getElementById("submitBtn").style.display = 'inline-block';
+            }
+        }
+
+        // Show first question on load
+        showQuestion(0);
+    </script>
+
+</body>
+</html>

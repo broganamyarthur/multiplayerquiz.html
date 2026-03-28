@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+        .main-container { display: flex; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .quiz-section { flex: 3; background: white; padding: 30px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .leaderboard-section { flex: 1; background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        
+        h1 { color: #333; margin-bottom: 20px; }
+        .timer-bar { 
+            background: #ddd; 
+            height: 30px; 
+            border-radius: 5px; 
+            overflow: hidden; 
+            margin: 20px 0;
+            display: flex;
+            align-items: center;
+        }
+        .timer-fill { 
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 100%;
+            transition: width 0.1s linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .speed-challenge {
+            background: #f7f9ff;
+            border: 2px solid #dce3ff;
+            border-radius: 10px;
+            padding: 12px;
+            margin: 14px 0 8px;
+        }
+        .speed-title {
+            font-weight: bold;
+            color: #3b4da1;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .speed-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        #speedCanvas {
+            width: 120px;
+            height: 120px;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            background: #fff;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        .speed-status {
+            font-size: 14px;
+            color: #333;
+            min-width: 210px;
+        }
+        .speed-status.done {
+            color: #1f7a3f;
+            font-weight: bold;
+        }
+        
+        .question-container { margin: 30px 0; }
+        .question-number { color: #999; font-size: 14px; }
+        .question-text { 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #333; 
+            margin: 15px 0; 
+        }
+        .host-reaction {
+            margin: 12px 0 0 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+        }
+        .host-reaction.correct {
+            background: #e8f9ee;
+            color: #1f7a3f;
+            border: 1px solid #bde5c8;
+        }
+        .host-reaction.wrong {
+            background: #fdecec;
+            color: #a12626;
+            border: 1px solid #f5b5b5;
+        }
+        .options { margin: 20px 0; }
+        .option-label { 
+            display: block; 
+            padding: 15px; 
+            margin: 10px 0; 
+            background: #f9f9f9; 
+            border: 2px solid #ddd;
+            border-radius: 5px; 
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .option-label:hover { 
+            background: #e8f4f8; 
+            border-color: #667eea;
+        }
+        .option-label input { margin-right: 10px; }
+        .option-label input:checked { accent-color: #667eea; }
+        .option-label:has(input:checked) {
+            background: #e8f4f8;
+            border-color: #667eea;
+        }
+        
+        .progress { 
+            background: #ddd; 
+            height: 10px; 
+            border-radius: 3px; 
+            margin: 20px 0; 
+            overflow: hidden;
+        }
+        .progress-bar { 
+            background: #667eea; 
+            height: 100%; 
+            transition: width 0.3s;
+        }
+        
+        .btn-container { text-align: center; margin-top: 30px; }
+        .btn { 
+            padding: 12px 30px; 
+            margin: 10px 5px; 
+            font-size: 16px; 
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover { background: #764ba2; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .leaderboard-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 15px; }
+        .leaderboard-item { 
+            padding: 10px;
+            margin: 8px 0;
+            background: #f9f9f9;
+            border-radius: 3px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        .leaderboard-item.leader { background: #fff3cd; border-left: 4px solid #ffc107; }
+        .leaderboard-item { 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .player-avatar { 
+            width: 32px; 
+            height: 32px; 
+            border-radius: 50%; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 16px;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .player-info { 
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-grow: 1;
+        }
+        .player-name { flex-grow: 1; }
+        .player-score { font-weight: bold; color: #667eea; }
+    </style>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="main-container">
+        <div class="quiz-section">
+            <h1>Quiz Time! 🎯</h1>
+            
+            <div class="progress">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            
+            <div class="timer-bar">
+                <div class="timer-fill" id="timerFill" style="width: 100%;">
+                    <span id="timerText">30</span>s
+                </div>
+            </div>
+
+            <div class="speed-challenge">
+                <div class="speed-title">⏱️ How quickly can you color in the square?</div>
+                <div class="speed-wrap">
+                    <canvas id="speedCanvas" width="120" height="120"></canvas>
+                    <div class="speed-status" id="speedStatus">Start coloring now...</div>
+                </div>
+            </div>
+            
+            <div class="question-container">
+                <div class="question-number" id="questionNumber">Question 1 of 35</div>
+                <div class="question-text" id="questionText">Loading...</div>
+                <div class="options" id="optionsContainer"></div>
+                <div class="host-reaction" id="hostReaction"></div>
+            </div>
+            
+            <div class="btn-container">
+                <button class="btn" id="nextBtn" onclick="nextQuestion()" disabled>Next Question</button>
+                <button class="btn" onclick="finishQuizClick()" id="finishBtn">Finish Quiz</button>
+            </div>
+        </div>
+        
+        <div class="leaderboard-section">
+            <div class="leaderboard-title">🏆 Leaderboard</div>
+            <div id="leaderboard"></div>
+        </div>
+    </div>
+
+    <script>
+        const gameId = "{{ game_id }}";
+        const socket = io();
+        const questions = {{ questions | tojson }};
+        let currentQuestion = 0;
+        let playerId = null;
+        let answers = {};
+        let timeLeft = 30;
+        let timerInterval = null;
+        const timePerQuestion = 30;
+        let speedChallengeStart = 0;
+        let speedChallengeActive = false;
+        let isDrawing = false;
+        let lastDrawPoint = null;
+        let speedCtx = null;
+        const speedBrushRadius = 28;
+        const speedFillTarget = 0.65;
+        const correctReactions = [
+            "Host says: Correct! Nice work. ✅",
+            "Great answer — keep it up! 🎯",
+            "That’s right! Brilliant. ⭐",
+            "Perfect pick! 🔥"
+        ];
+        const wrongReactions = [
+            "Host says: Not this one — next question! 💪",
+            "Wrong answer, but you’re still in it! 🚀",
+            "Almost! Shake it off and continue. 🔄",
+            "Nope this round — trust your next instinct! 🎲"
+        ];
+
+        socket.on("connect", function() {
+            console.log("Connected to quiz!");
+            playerId = sessionStorage.getItem("playerId");
+            if (!playerId) {
+                playerId = Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem("playerId", playerId);
+            }
+            
+            // Join the game room
+            socket.emit("join_room", { game_id: gameId });
+            
+            // Start loading questions immediately
+            init();
+        });
+
+        socket.on("leaderboard_update", function(data) {
+            console.log("Leaderboard update:", data);
+            updateLeaderboard(data.players);
+        });
+
+        socket.on("game_finished", function(data) {
+            console.log("Game finished!");
+            clearInterval(timerInterval);
+            window.location.href = "/multiplayer_result/" + gameId;
+        });
+
+        function init() {
+            console.log("Loading questions...", questions.length);
+            initSpeedChallenge();
+            loadQuestion(0);
+            startTimer();
+        }
+
+        function initSpeedChallenge() {
+            const canvas = document.getElementById("speedCanvas");
+            speedCtx = canvas.getContext("2d");
+
+            canvas.addEventListener("mousedown", startDraw);
+            canvas.addEventListener("mousemove", drawOnCanvas);
+            window.addEventListener("mouseup", stopDraw);
+
+            canvas.addEventListener("touchstart", startDraw, { passive: false });
+            canvas.addEventListener("touchmove", drawOnCanvas, { passive: false });
+            window.addEventListener("touchend", stopDraw, { passive: false });
+        }
+
+        function resetSpeedChallenge() {
+            if (!speedCtx) return;
+            const canvas = document.getElementById("speedCanvas");
+            speedCtx.clearRect(0, 0, canvas.width, canvas.height);
+            speedCtx.fillStyle = "#ffffff";
+            speedCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+            speedChallengeStart = performance.now();
+            speedChallengeActive = true;
+            isDrawing = false;
+            lastDrawPoint = null;
+
+            const status = document.getElementById("speedStatus");
+            status.textContent = "Start coloring now...";
+            status.className = "speed-status";
+        }
+
+        function getCanvasPoint(event) {
+            const canvas = document.getElementById("speedCanvas");
+            const rect = canvas.getBoundingClientRect();
+            const pointer = event.touches ? event.touches[0] : event;
+            return {
+                x: (pointer.clientX - rect.left) * (canvas.width / rect.width),
+                y: (pointer.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function startDraw(event) {
+            if (!speedChallengeActive) return;
+            event.preventDefault();
+            isDrawing = true;
+            const point = getCanvasPoint(event);
+            lastDrawPoint = point;
+            drawOnCanvas(event);
+        }
+
+        function stopDraw(event) {
+            if (!speedChallengeActive) return;
+            if (event) event.preventDefault();
+            isDrawing = false;
+            lastDrawPoint = null;
+        }
+
+        function drawOnCanvas(event) {
+            if (!speedChallengeActive || !isDrawing || !speedCtx) return;
+            event.preventDefault();
+
+            const point = getCanvasPoint(event);
+            speedCtx.fillStyle = "#667eea";
+            speedCtx.strokeStyle = "#667eea";
+            speedCtx.lineWidth = speedBrushRadius * 2;
+            speedCtx.lineCap = "round";
+
+            if (lastDrawPoint) {
+                speedCtx.beginPath();
+                speedCtx.moveTo(lastDrawPoint.x, lastDrawPoint.y);
+                speedCtx.lineTo(point.x, point.y);
+                speedCtx.stroke();
+            }
+
+            speedCtx.beginPath();
+            speedCtx.arc(point.x, point.y, speedBrushRadius, 0, Math.PI * 2);
+            speedCtx.fill();
+            lastDrawPoint = point;
+
+            checkSpeedChallengeComplete();
+        }
+
+        function checkSpeedChallengeComplete() {
+            const canvas = document.getElementById("speedCanvas");
+            const pixels = speedCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+            let filled = 0;
+
+            for (let i = 0; i < pixels.length; i += 4) {
+                if (pixels[i] < 245 || pixels[i + 1] < 245 || pixels[i + 2] < 245) {
+                    filled++;
+                }
+            }
+
+            const total = canvas.width * canvas.height;
+            const percent = filled / total;
+
+            if (percent >= speedFillTarget) {
+                speedChallengeActive = false;
+                const seconds = ((performance.now() - speedChallengeStart) / 1000).toFixed(2);
+                const status = document.getElementById("speedStatus");
+                status.textContent = `Completed in ${seconds}s! Nice speed!`;
+                status.className = "speed-status done";
+            }
+        }
+
+        function loadQuestion(index) {
+            console.log("Loading question", index);
+            currentQuestion = index;
+            const question = questions[index];
+            resetSpeedChallenge();
+            
+            document.getElementById("questionNumber").textContent = (index + 1) + " of " + questions.length;
+            document.getElementById("questionText").textContent = question.question;
+            const reactionEl = document.getElementById("hostReaction");
+            reactionEl.style.display = "none";
+            reactionEl.className = "host-reaction";
+            reactionEl.textContent = "";
+            
+            // Display question image if available
+            let imageHtml = "";
+            if (question.image) {
+                imageHtml = `<img src="${question.image}" style="width: 100%; max-width: 400px; height: 250px; object-fit: cover; border-radius: 8px; margin: 15px 0;" />`;
+            }
+            
+            let optionsHtml = imageHtml;
+            question.options.forEach(opt => {
+                optionsHtml += `
+                    <label class="option-label">
+                        <input type="radio" name="answer" value="${opt}" onchange="selectAnswer('${opt}')">
+                        ${opt}
+                    </label>
+                `;
+            });
+            document.getElementById("optionsContainer").innerHTML = optionsHtml;
+            
+            const progress = ((index) / questions.length) * 100;
+            document.getElementById("progressBar").style.width = progress + "%";
+            
+            document.getElementById("nextBtn").disabled = true;
+            resetTimer();
+        }
+
+        function getRandomReaction(isCorrect) {
+            const source = isCorrect ? correctReactions : wrongReactions;
+            return source[Math.floor(Math.random() * source.length)];
+        }
+
+        function selectAnswer(answer) {
+            answers[currentQuestion] = answer;
+            document.getElementById("nextBtn").disabled = false;
+
+            const isCorrect = answer === questions[currentQuestion].answer;
+            const reactionEl = document.getElementById("hostReaction");
+            reactionEl.textContent = getRandomReaction(isCorrect);
+            reactionEl.className = `host-reaction ${isCorrect ? 'correct' : 'wrong'}`;
+            reactionEl.style.display = "block";
+
+            document.querySelectorAll('input[name="answer"]').forEach((input) => {
+                input.disabled = true;
+            });
+            
+            // Auto-submit after selection
+            socket.emit("submit_answer", {
+                game_id: gameId,
+                player_id: playerId,
+                question_index: currentQuestion,
+                answer: answer
+            });
+        }
+
+        function nextQuestion() {
+            if (currentQuestion + 1 < questions.length) {
+                loadQuestion(currentQuestion + 1);
+            } else {
+                finishQuiz();
+            }
+        }
+
+        function finishQuizClick() {
+            console.log("Finish button clicked, gameId:", gameId);
+            finishQuiz();
+            // Fallback after 2 seconds in case server doesn't respond
+            setTimeout(() => {
+                console.log("Fallback redirect to results");
+                window.location.href = "/multiplayer_result/" + gameId;
+            }, 2000);
+        }
+
+        function finishQuiz() {
+            clearInterval(timerInterval);
+            console.log("Emitting finish_game for gameId:", gameId);
+            socket.emit("finish_game", { game_id: gameId }, function(ack) {
+                console.log("Finish game acknowledged:", ack);
+            });
+        }
+
+        function startTimer() {
+            resetTimer();
+        }
+
+        function resetTimer() {
+            timeLeft = timePerQuestion;
+            clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                const percentage = (timeLeft / timePerQuestion) * 100;
+                document.getElementById("timerFill").style.width = percentage + "%";
+                document.getElementById("timerText").textContent = timeLeft;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    // Auto-advance to next question
+                    if (currentQuestion + 1 < questions.length) {
+                        nextQuestion();
+                    } else {
+                        finishQuiz();
+                    }
+                }
+            }, 1000);
+        }
+
+        function updateLeaderboard(players) {
+            const leaderboard = document.getElementById("leaderboard");
+            const sortedPlayers = Object.entries(players)
+                .map(([id, player]) => ({ id, ...player }))
+                .sort((a, b) => b.score - a.score);
+            
+            let html = "";
+            const avatarEmojis = ["🎯", "⭐", "🚀", "💎", "🔥", "👑", "🎪", "🌟"];
+            
+            sortedPlayers.forEach((player, index) => {
+                const medals = ["🥇", "🥈", "🥉"];
+                const medal = medals[index] || "";
+                const isLeader = index === 0;
+                const avatarEmoji = avatarEmojis[index % avatarEmojis.length];
+                
+                html += `
+                    <div class="leaderboard-item ${isLeader ? 'leader' : ''}">
+                        <span class="medal">${medal}</span>
+                        <div class="player-info">
+                            <div class="player-avatar">${avatarEmoji}</div>
+                            <span class="player-name">${player.name}</span>
+                        </div>
+                        <span class="player-score">${player.score}</span>
+                    </div>
+                `;
+            });
+            
+            leaderboard.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

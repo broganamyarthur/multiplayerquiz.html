@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 50px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { color: #333; }
+        .game-info { background: #e8f4f8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .game-id { font-weight: bold; font-size: 18px; color: #667eea; }
+        .players-list { margin: 20px 0; }
+        .player-item { padding: 10px; background: #f9f9f9; margin: 5px 0; border-radius: 3px; }
+        .btn { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            font-size: 14px; 
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .btn:hover { background: #764ba2; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; }
+    </style>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Game Lobby</h1>
+        <div class="game-info">
+            <p>Game ID: <span class="game-id" id="gameId">{{ game_id }}</span></p>
+            <button class="btn" onclick="copyGameId()">Copy Game ID</button>
+        </div>
+        
+        <h3>Players in Game:</h3>
+        <div class="players-list" id="playersList">
+            <p id="waitingText">Waiting for players...</p>
+        </div>
+        
+        <button class="btn" id="startBtn" onclick="startGame()">Start Game</button>
+        <button class="btn" onclick="goHome()">Go Home</button>
+    </div>
+
+    <script>
+        const gameId = "{{ game_id }}";
+        const socket = io();
+        let playerId = null;
+        let playerCount = 0;
+        let players = {};
+
+        socket.on("connect", function() {
+            console.log("Socket connected!");
+            playerId = sessionStorage.getItem("playerId");
+            console.log("Player ID from session:", playerId);
+            
+            // Join the room for this game
+            socket.emit("join_room", { game_id: gameId });
+            socket.emit("get_game_state", { game_id: gameId });
+        });
+
+        socket.on("game_state", function(data) {
+            console.log("Game state received:", data);
+            players = data.players;
+            playerCount = Object.keys(players).length;
+            updatePlayersList(players);
+        });
+
+        socket.on("player_joined", function(data) {
+            console.log("Player joined:", data);
+            playerId = data.player_id;
+            sessionStorage.setItem("playerId", playerId);
+            players = data.players;
+            playerCount = Object.keys(players).length;
+            updatePlayersList(players);
+        });
+
+        socket.on("game_started", function(data) {
+            console.log("Game started, redirecting...");
+            window.location.href = "/multiplayer_quiz/" + gameId;
+        });
+
+        function updatePlayersList(playersList) {
+            const playerElement = document.getElementById("playersList");
+            playerElement.innerHTML = "";
+            for (let id in playersList) {
+                const player = playersList[id];
+                const div = document.createElement("div");
+                div.className = "player-item";
+                div.textContent = player.name + " - Score: " + player.score;
+                playerElement.appendChild(div);
+            }
+        }
+
+        function startGame() {
+            console.log("Start game clicked!");
+            socket.emit("start_game", { game_id: gameId });
+        }
+
+        function copyGameId() {
+            navigator.clipboard.writeText(gameId);
+            alert("Game ID copied to clipboard!");
+        }
+
+        function goHome() {
+            window.location.href = "/";
+        }
+    </script>
+</body>
+</html>

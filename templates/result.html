@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            width: 100%;
+            max-width: 560px;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            padding: 36px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 2rem;
+        }
+        .score {
+            color: #444;
+            font-size: 1.15rem;
+            margin-bottom: 16px;
+        }
+        .host-message {
+            background: #f4f7ff;
+            color: #333;
+            border-left: 4px solid #667eea;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            font-weight: 600;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: transform 0.2s ease;
+        }
+        .btn:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Quiz Complete!</h1>
+        <p class="score">You scored <strong>{{ score }}</strong> out of <strong>{{ total }}</strong></p>
+        <p class="host-message">{{ host_message }}</p>
+        <div class="btn-group">
+            <a class="btn" href="/quiz">Play Again</a>
+            <a class="btn" href="/">Go Home</a>
+        </div>
+    </div>
+</body>
+</html>

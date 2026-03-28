@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 50px 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh;
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 50px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+        .logo { 
+            font-size: 60px; 
+            margin-bottom: 20px;
+        }
+        .host-image {
+            width: 110px;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 50%;
+            margin-bottom: 12px;
+            border: 4px solid #667eea;
+        }
+        .host-label {
+            color: #667eea;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .cartoon-host {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 16px;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 3;
+            pointer-events: none;
+            animation: dance-around 14s linear infinite, dance-bounce 0.9s ease-in-out infinite;
+        }
+        .cartoon-head {
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            border: 4px solid #667eea;
+            overflow: hidden;
+            background: #fff;
+            z-index: 2;
+            position: relative;
+        }
+        .cartoon-head img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .cartoon-body {
+            width: 85px;
+            height: 95px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px 24px 16px 16px;
+            margin-top: -8px;
+            position: relative;
+            z-index: 1;
+        }
+        .cartoon-body::before,
+        .cartoon-body::after {
+            content: "";
+            position: absolute;
+            top: 16px;
+            width: 18px;
+            height: 58px;
+            background: #5a6fd6;
+            border-radius: 12px;
+        }
+        .cartoon-body::before {
+            left: -16px;
+            transform: rotate(18deg);
+            transform-origin: top center;
+            animation: arm-left 0.6s ease-in-out infinite alternate;
+        }
+        .cartoon-body::after {
+            right: -16px;
+            transform: rotate(-18deg);
+            transform-origin: top center;
+            animation: arm-right 0.6s ease-in-out infinite alternate;
+        }
+        .cartoon-legs {
+            display: flex;
+            gap: 16px;
+            margin-top: 4px;
+        }
+        .cartoon-leg {
+            width: 16px;
+            height: 42px;
+            background: #333;
+            border-radius: 10px;
+            animation: leg-step 0.5s ease-in-out infinite alternate;
+        }
+        .cartoon-leg:last-child {
+            animation-delay: 0.25s;
+        }
+        @keyframes dance-around {
+            0% { transform: translate(0, 0) rotate(0deg); }
+            20% { transform: translate(calc(100vw - 200px), 30px) rotate(6deg); }
+            40% { transform: translate(calc(100vw - 220px), calc(100vh - 360px)) rotate(-6deg); }
+            60% { transform: translate(40px, calc(100vh - 330px)) rotate(5deg); }
+            80% { transform: translate(calc(50vw - 110px), 120px) rotate(-5deg); }
+            100% { transform: translate(0, 0) rotate(0deg); }
+        }
+        @keyframes dance-bounce {
+            0%, 100% { margin-top: 0; }
+            50% { margin-top: -10px; }
+        }
+        @keyframes arm-left {
+            0% { transform: rotate(8deg); }
+            100% { transform: rotate(36deg); }
+        }
+        @keyframes arm-right {
+            0% { transform: rotate(-8deg); }
+            100% { transform: rotate(-36deg); }
+        }
+        @keyframes leg-step {
+            0% { transform: translateY(0) rotate(0deg); }
+            100% { transform: translateY(-6px) rotate(6deg); }
+        }
+        h1 { 
+            color: #333; 
+            margin-bottom: 15px;
+            font-size: 2.5em;
+        }
+        .subtitle {
+            color: #888;
+            font-size: 14px;
+            margin-top: -8px;
+            margin-bottom: 18px;
+        }
+        p { 
+            color: #666; 
+            font-size: 18px;
+            margin-bottom: 30px;
+        }
+        .button-group { 
+            margin-top: 30px; 
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .btn { 
+            padding: 15px 30px; 
+            font-size: 16px; 
+            cursor: pointer;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+        .btn:hover { transform: translateY(-3px); box-shadow: 0 5px 20px rgba(102,126,234,0.4); }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1; }
+        .modal-content { background: white; margin: 5% auto; padding: 40px; border-radius: 15px; max-width: 450px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .modal-close { color: #999; float: right; font-size: 28px; cursor: pointer; }
+        .modal-close:hover { color: #000; }
+        .modal h2 { color: #333; margin-bottom: 20px; }
+        .modal input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border: 2px solid #ddd; 
+            border-radius: 5px; 
+            font-size: 14px;
+        }
+        .modal button { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .modal button:hover { opacity: 0.9; }
+        hr { margin: 20px 0; border: none; border-top: 1px solid #ddd; }
+    </style>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🎯</div>
+        <div class="cartoon-host">
+            <div class="cartoon-head">
+                <img src="{{ url_for('static', filename='host.jpeg') }}" alt="Game Host" onerror="this.style.display='none'; this.parentElement.style.display='none';">
+            </div>
+            <div class="cartoon-body"></div>
+            <div class="cartoon-legs">
+                <div class="cartoon-leg"></div>
+                <div class="cartoon-leg"></div>
+            </div>
+            <div class="host-label">Game Host</div>
+        </div>
+        <h1>Pauls Friday Quiz</h1>
+        <div class="subtitle">created by Brogan and Sean</div>
+        <p>Test your knowledge with our trivia quiz!</p>
+        <div class="button-group">
+            <button class="btn" onclick="location.href='/quiz'">🎮 Single Player Quiz</button>
+            <button class="btn" onclick="showMultiplayerOptions()">👥 Play Multiplayer</button>
+        </div>
+    </div>
+
+    <div id="multiplayerModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2>🎪 Multiplayer Quiz</h2>
+            
+            <div id="createGameForm">
+                <p style="color: #666; margin-bottom: 15px;">Enter your name:</p>
+                <input type="text" id="playerName" placeholder="Your name" value="">
+                <button onclick="createGame()">➕ Create New Game</button>
+                <hr>
+                <p style="color: #666; margin-bottom: 15px;">Or join existing game:</p>
+                <input type="text" id="gameIdInput" placeholder="Enter Game ID">
+                <button onclick="joinGame()">🔗 Join Game</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        function showMultiplayerOptions() {
+            document.getElementById("multiplayerModal").style.display = "block";
+        }
+
+        function closeModal() {
+            document.getElementById("multiplayerModal").style.display = "none";
+        }
+
+        function createGame() {
+            const playerName = document.getElementById("playerName").value.trim();
+            if (!playerName) {
+                alert("Please enter your name");
+                return;
+            }
+            
+            socket.emit("create_game", { player_name: playerName });
+            socket.on("game_created", function(data) {
+                sessionStorage.setItem("playerId", data.player_id);
+                sessionStorage.setItem("playerName", playerName);
+                window.location.href = "/lobby/" + data.game_id;
+            });
+        }
+
+        function joinGame() {
+            const playerName = document.getElementById("playerName").value.trim();
+            const gameId = document.getElementById("gameIdInput").value.trim();
+            
+            if (!playerName) {
+                alert("Please enter your name");
+                return;
+            }
+            if (!gameId) {
+                alert("Please enter a Game ID");
+                return;
+            }
+            
+            socket.emit("join_game", { game_id: gameId, player_name: playerName });
+            socket.on("player_joined", function(data) {
+                sessionStorage.setItem("playerId", data.player_id);
+                sessionStorage.setItem("playerName", playerName);
+                window.location.href = "/lobby/" + gameId;
+            });
+            socket.on("error", function(data) {
+                alert("Error: " + data.message);
+            });
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById("multiplayerModal");
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>

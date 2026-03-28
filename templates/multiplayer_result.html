@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 50px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .leaderboard { margin: 30px 0; }
+        .leaderboard-item { 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px; 
+            background: #f9f9f9; 
+            margin: 10px 0; 
+            border-radius: 3px;
+            border-left: 4px solid #667eea;
+        }
+        .rank { font-weight: bold; color: #666; min-width: 30px; }
+        .player-info { display: flex; align-items: center; gap: 12px; flex-grow: 1; }
+        .player-avatar { 
+            width: 40px; 
+            height: 40px; 
+            border-radius: 50%; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .player-name { font-weight: bold; color: #333; }
+        .score { color: #667eea; font-size: 18px; font-weight: bold; }
+        .medal { font-size: 24px; margin-right: 10px; }
+        .btn { 
+            padding: 10px 20px; 
+            margin: 10px 5px; 
+            font-size: 14px; 
+            cursor: pointer;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .btn:hover { background: #764ba2; }
+        .button-group { text-align: center; margin-top: 30px; }
+    </style>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎉 Quiz Complete!</h1>
+        <h2 style="text-align: center; color: #667eea;">Final Leaderboard</h2>
+        
+        <div class="leaderboard" id="leaderboard">
+            <p style="text-align: center;">Loading results...</p>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn" onclick="playAgain()">Play Another Round</button>
+            <button class="btn" onclick="goHome()">Go Home</button>
+        </div>
+    </div>
+
+    <script>
+        const gameId = "{{ game_id }}";
+        const socket = io();
+        const game = {{ game | tojson }};
+        const totalQuestions = 35;
+        
+        console.log("Game object:", game);
+        
+        function displayResults() {
+            const leaderboard = document.getElementById("leaderboard");
+            
+            if (!game || !game.players) {
+                leaderboard.innerHTML = "<p style='text-align: center;'>Error loading results. Please try again.</p>";
+                return;
+            }
+            
+            let html = "";
+            let rank = 1;
+            const medals = ["🥇", "🥈", "🥉"];
+            
+            try {
+                // Sort players by score
+                const sortedPlayers = Object.entries(game.players).sort((a, b) => b[1].score - a[1].score);
+                
+                console.log("Sorted players:", sortedPlayers);
+                
+                sortedPlayers.forEach(([id, player], index) => {
+                    const medal = medals[index] || "";
+                    const firstLetter = player.name.charAt(0).toUpperCase();
+                    const avatarEmojis = ["🎯", "⭐", "🚀", "💎", "🔥", "👑", "🎪", "🌟"];
+                    const avatarEmoji = avatarEmojis[index % avatarEmojis.length];
+                    
+                    html += `
+                        <div class="leaderboard-item">
+                            <span class="medal">${medal}</span>
+                            <span class="rank">#${rank}</span>
+                            <div class="player-info">
+                                <div class="player-avatar">${avatarEmoji}</div>
+                                <span class="player-name">${player.name}</span>
+                            </div>
+                            <span class="score">${player.score}/${totalQuestions}</span>
+                        </div>
+                    `;
+                    rank++;
+                });
+                
+                leaderboard.innerHTML = html;
+            } catch (error) {
+                console.error("Error displaying results:", error);
+                leaderboard.innerHTML = "<p style='text-align: center;'>Error displaying results: " + error.message + "</p>";
+            }
+        }
+        
+        function playAgain() {
+            // Create new game
+            socket.emit("create_game", { player_name: sessionStorage.getItem("playerName") || "Player" });
+            socket.on("game_created", function(data) {
+                window.location.href = "/lobby/" + data.game_id;
+            });
+        }
+        
+        function goHome() {
+            window.location.href = "/";
+        }
+        
+        displayResults();
+    </script>
+</body>
+</html>
