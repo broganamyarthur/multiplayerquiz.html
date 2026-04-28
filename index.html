@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz App - Single Player</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            color: #333;
+        }
+        .logo {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        .score {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        .question-container {
+            margin-bottom: 30px;
+        }
+        .question {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .question-image {
+            max-width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .option {
+            padding: 15px;
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 16px;
+        }
+        .option:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+        .option.selected {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+        .option.correct {
+            background: #28a745;
+            color: white;
+            border-color: #28a745;
+        }
+        .option.incorrect {
+            background: #dc3545;
+            color: white;
+            border-color: #dc3545;
+        }
+        .btn {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            margin: 10px;
+            transition: background 0.3s ease;
+        }
+        .btn:hover {
+            background: #5a67d8;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 18px;
+        }
+        .result.correct {
+            background: #d4edda;
+            color: #155724;
+        }
+        .result.incorrect {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .progress {
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        .final-score {
+            font-size: 36px;
+            color: #667eea;
+            margin: 20px 0;
+        }
+        .restart-btn {
+            background: #28a745;
+        }
+        .restart-btn:hover {
+            background: #218838;
+        }
+        @media (max-width: 600px) {
+            .options {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 20px;
+            }
+            .logo {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🧠 Quiz App</div>
+
+        <div id="start-screen">
+            <h2>Welcome to the Quiz!</h2>
+            <p>Test your knowledge with 10 questions</p>
+            <button class="btn" onclick="startQuiz()">Start Quiz</button>
+        </div>
+
+        <div id="quiz-screen" style="display: none;">
+            <div class="score">Score: <span id="score">0</span></div>
+            <div class="progress">Question <span id="current-question">1</span> of <span id="total-questions">10</span></div>
+
+            <div class="question-container">
+                <div class="question" id="question"></div>
+                <img id="question-image" class="question-image" style="display: none;" alt="Question image">
+                <div class="options" id="options"></div>
+            </div>
+
+            <button class="btn" id="next-btn" onclick="nextQuestion()" style="display: none;">Next Question</button>
+        </div>
+
+        <div id="result-screen" style="display: none;">
+            <h2>Quiz Complete!</h2>
+            <div class="final-score">Final Score: <span id="final-score">0</span>/10</div>
+            <div id="performance"></div>
+            <button class="btn restart-btn" onclick="restartQuiz()">Take Quiz Again</button>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            {
+                "question": "What year did the Berlin Wall fall?",
+                "options": ["1987", "1989", "1991"],
+                "answer": "1989",
+                "image": "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=400&h=300&fit=crop"
+            },
+            {
+                "question": "Which planet is known as the Red Planet?",
+                "options": ["Mars", "Jupiter", "Venus"],
+                "answer": "Mars",
+                "image": "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=400&h=300&fit=crop"
+            },
+            {
+                "question": "Who wrote 'The Old Man and the Sea'?",
+                "options": ["Ernest Hemingway", "Mark Twain", "George Orwell"],
+                "answer": "Ernest Hemingway",
+                "image": "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400&h=300&fit=crop"
+            },
+            {
+                "question": "What is the largest ocean on Earth?",
+                "options": ["Atlantic Ocean", "Indian Ocean", "Pacific Ocean"],
+                "answer": "Pacific Ocean",
+                "image": "https://images.unsplash.com/photo-1505142468610-359e7d316be0?w=400&h=300&fit=crop"
+            },
+            {
+                "question": "Which country invented the sport of golf?",
+                "options": ["Ireland", "Scotland", "England"],
+                "answer": "Scotland",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/6/6e/Golfer_swing.jpg"
+            },
+            {
+                "question": "Who played John McClane in 'Die Hard'?",
+                "options": ["Bruce Willis", "Mel Gibson", "Tom Cruise"],
+                "answer": "Bruce Willis",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Bruce_Willis_by_Gage_Skidmore_3.jpg"
+            },
+            {
+                "question": "What year was the first Matrix movie released?",
+                "options": ["1997", "1999", "2001"],
+                "answer": "1999",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/2/26/Keanu_Reeves_and_Carrie_Ann_Moss_shoot_motorcycle_scene_for_Matrix_4_%28cropped%29.jpg"
+            },
+            {
+                "question": "Which TV series features Tony Soprano?",
+                "options": ["Breaking Bad", "The Sopranos", "Boardwalk Empire"],
+                "answer": "The Sopranos",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/1/1f/James_Gandolfini_%40_Toronto_International_Film_Festival_2011.jpg"
+            },
+            {
+                "question": "Who directed Jurassic Park?",
+                "options": ["James Cameron", "Steven Spielberg", "Ridley Scott"],
+                "answer": "Steven Spielberg",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/c/ca/MKr25380_Steven_Spielberg_%28Berlinale_2023%29.jpg"
+            },
+            {
+                "question": "What is the name of Rocky Balboa's trainer?",
+                "options": ["Mickey", "Apollo", "Duke"],
+                "answer": "Mickey",
+                "image": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Sylvester_Stallone_-_1977.jpg"
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let selectedAnswer = null;
+
+        function startQuiz() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('quiz-screen').style.display = 'block';
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            document.getElementById('question').textContent = question.question;
+            document.getElementById('current-question').textContent = currentQuestionIndex + 1;
+            document.getElementById('total-questions').textContent = questions.length;
+
+            if (question.image) {
+                document.getElementById('question-image').src = question.image;
+                document.getElementById('question-image').style.display = 'block';
+            } else {
+                document.getElementById('question-image').style.display = 'none';
+            }
+
+            const optionsContainer = document.getElementById('options');
+            optionsContainer.innerHTML = '';
+
+            question.options.forEach((option, index) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option';
+                optionElement.textContent = option;
+                optionElement.onclick = () => selectAnswer(optionElement, option);
+                optionsContainer.appendChild(optionElement);
+            });
+
+            selectedAnswer = null;
+            document.getElementById('next-btn').style.display = 'none';
+        }
+
+        function selectAnswer(element, answer) {
+            if (selectedAnswer) return;
+
+            selectedAnswer = answer;
+            const options = document.querySelectorAll('.option');
+            options.forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+
+            const correctAnswer = questions[currentQuestionIndex].answer;
+            if (answer === correctAnswer) {
+                element.classList.add('correct');
+                score++;
+                document.getElementById('score').textContent = score;
+            } else {
+                element.classList.add('incorrect');
+                options.forEach(opt => {
+                    if (opt.textContent === correctAnswer) {
+                        opt.classList.add('correct');
+                    }
+                });
+            }
+
+            document.getElementById('next-btn').style.display = 'inline-block';
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                showQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            document.getElementById('quiz-screen').style.display = 'none';
+            document.getElementById('result-screen').style.display = 'block';
+            document.getElementById('final-score').textContent = score;
+
+            const performance = document.getElementById('performance');
+            let message = '';
+            if (score >= 9) {
+                message = '🎉 Excellent! You\'re a quiz master!';
+            } else if (score >= 7) {
+                message = '👍 Great job! Well done!';
+            } else if (score >= 5) {
+                message = '🙂 Good effort! Keep practicing!';
+            } else {
+                message = '📚 Keep learning! You\'ll get better!';
+            }
+            performance.textContent = message;
+        }
+
+        function restartQuiz() {
+            currentQuestionIndex = 0;
+            score = 0;
+            selectedAnswer = null;
+            document.getElementById('score').textContent = '0';
+            document.getElementById('result-screen').style.display = 'none';
+            document.getElementById('quiz-screen').style.display = 'block';
+            showQuestion();
+        }
+    </script>
+</body>
+</html>
