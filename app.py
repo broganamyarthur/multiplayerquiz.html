@@ -2,10 +2,18 @@ from flask import Flask, render_template, request, jsonify, redirect
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
 import random
+import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Configure for production
+@app.before_request
+def before_request():
+    if request.headers.get('X-Forwarded-Proto') == 'https':
+        request.environ['wsgi.url_scheme'] = 'https'
+
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 questions = [
     {
@@ -415,4 +423,5 @@ def on_finish_game(data):
     emit("game_finished", {"results": sorted_players}, to=game_id)
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port)
