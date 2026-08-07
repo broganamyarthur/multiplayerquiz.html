@@ -257,6 +257,10 @@ class Game:
 def home():
     return render_template("index.html")
 
+@app.route("/healthz")
+def healthz():
+    return jsonify({"status": "ok"})
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=questions)
@@ -424,4 +428,4 @@ def on_finish_game(data):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port, debug=False)
