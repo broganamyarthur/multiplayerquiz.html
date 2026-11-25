@@ -3,9 +3,10 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
 import random
 import os
+import secrets
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 
 # Configure for production
 @app.before_request
