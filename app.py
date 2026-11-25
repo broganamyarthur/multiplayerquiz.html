@@ -291,7 +291,7 @@ def submit():
         "result.html",
         score=score,
         total=len(questions),
-        host_message=random.choice(host_reactions)
+        host_message=random.choice(host_reactions)    # nosec B311 # picks a cosmetic host message, not used for security
     )
 
 @app.route("/multiplayer")
@@ -434,4 +434,4 @@ def on_finish_game(data):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host="0.0.0.0", port=port, debug=False)
+    socketio.run(app, host=os.environ.get("HOST", "127.0.0.1"), port=port, debug=False)

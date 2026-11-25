@@ -8,7 +8,7 @@ Requires the GitHub CLI (gh). Re-running creates duplicate issues, so run it onc
 """
 
 import argparse
-import subprocess
+import subprocess  # nosec B404 # only used to run fixed gh CLI commands
 
 REPO = "broganamyarthur/multiplayerquiz.html"
 PROJECT = "quiz web app"  # must match the GitHub Projects board title exactly
@@ -124,7 +124,7 @@ def gh(args, dry_run):
     if dry_run:
         print("gh", " ".join(args[:4]), "...")
         return
-    subprocess.run(["gh", *args], check=True)
+    subprocess.run(["gh", *args], check=True)  # nosec B603 B607 # fixed gh commands, no user input; manual tool, not deployed
 
 
 def issue_body(story, criteria, links, estimate):
