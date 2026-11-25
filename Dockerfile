@@ -9,4 +9,7 @@ COPY . .
 
 EXPOSE 5000
 
+RUN useradd --create-home appuser
+USER appuser
+
 CMD ["gunicorn", "--workers", "1", "--threads", "100", "--bind", "0.0.0.0:5000", "app:app"]
