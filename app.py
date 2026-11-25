@@ -14,7 +14,12 @@ def before_request():
     if request.headers.get('X-Forwarded-Proto') == 'https':
         request.environ['wsgi.url_scheme'] = 'https'
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+allowed_origins = os.environ.get('ALLOWED_ORIGINS')
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=allowed_origins.split(',') if allowed_origins else None,
+    async_mode='threading',
+)
 
 questions = [
     {
