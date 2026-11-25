@@ -33,3 +33,11 @@ def test_submit_route_returns_score_page(client):
 
 def test_secret_key_is_not_hardcoded_default():
     assert app.config["SECRET_KEY"] != "your-secret-key"
+
+
+def test_socketio_rejects_unknown_origin(client):
+    response = client.get(
+        "/socket.io/?EIO=4&transport=polling",
+        headers={"Origin": "https://evil.example.com"},
+    )
+    assert response.status_code == 400
