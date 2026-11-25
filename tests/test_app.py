@@ -29,3 +29,7 @@ def test_submit_route_returns_score_page(client):
     })
     assert response.status_code == 200
     assert b'Your Score' in response.data or b'Fantastic performance!' in response.data
+    
+
+def test_secret_key_is_not_hardcoded_default():
+    assert app.config["SECRET_KEY"] != "your-secret-key"
