@@ -18,8 +18,14 @@ jobs:
       with:
         python-version: '3.13'
 
-    - name: Install safety
-      run: pip install safety
+    - name: Install security tools
+      run: pip install safety pip-audit bandit
 
-    - name: Check dependencies for known vulnerabilities
+    - name: Check dependencies with Safety
       run: safety check -r requirements.txt
+
+    - name: Check dependencies with pip-audit
+      run: pip-audit -r requirements.txt
+
+    - name: Scan code with Bandit
+      run: bandit -r . -x ./tests
