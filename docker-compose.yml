@@ -1,8 +1,27 @@
-version: '3.8'
 services:
   app:
     build: .
     ports:
       - "5000:5000"
     environment:
-      PORT: 5000
+      DATABASE_URL: postgresql+psycopg://quiz:quiz_local_only@db:5432/quiz
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: quiz
+      POSTGRES_PASSWORD: quiz_local_only
+      POSTGRES_DB: quiz
+    volumes:
+      - quiz-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quiz -d quiz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  quiz-data:
