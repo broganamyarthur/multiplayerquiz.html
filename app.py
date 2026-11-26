@@ -96,6 +96,40 @@ def get_question(question_id):
     question = db.get_or_404(Question, question_id)
     return jsonify(question.to_dict())
 
+def validate_question(data):
+    """Return an error message if the question data is invalid, otherwise None."""
+    if not isinstance(data, dict):
+        return "Request body must be JSON"
+    text = (data.get("text") or "").strip()
+    options = data.get("options")
+    answer = data.get("answer")
+    if not text:
+        return "Question text is required"
+    if not isinstance(options, list) or len(options) < 2:
+        return "At least 2 options are required"
+    if answer not in options:
+        return "The answer must be one of the options"
+    return None
+
+
+@app.route("/api/questions", methods=["POST"])
+def create_question():
+    """Add a new question to the question bank."""
+    data = request.get_json(silent=True)
+    error = validate_question(data)
+    if error:
+        return jsonify({"error": error}), 400
+    question = Question(
+        text=data["text"].strip(),
+        options=data["options"],
+        answer=data["answer"],
+        image=data.get("image"),
+        category=data.get("category"),
+    )
+    db.session.add(question)
+    db.session.commit()
+    return jsonify(question.to_dict()), 201
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=load_questions())
