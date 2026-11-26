@@ -90,6 +90,12 @@ def list_questions():
     questions = Question.query.order_by(Question.id).all()
     return jsonify([q.to_dict() for q in questions])
 
+@app.route("/api/questions/<int:question_id>", methods=["GET"])
+def get_question(question_id):
+    """Return one question, or 404 if it doesn't exist."""
+    question = db.get_or_404(Question, question_id)
+    return jsonify(question.to_dict())
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=load_questions())
