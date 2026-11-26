@@ -41,6 +41,16 @@ def seed_database():
 
 with app.app_context():
     seed_database()
+
+
+   
+
+def load_questions():
+    """Return all questions from the database, in the format the templates expect."""
+    return [
+        {"question": q.text, "options": q.options, "answer": q.answer, "image": q.image}
+        for q in Question.query.order_by(Question.id).all()
+    ]
 games = {}
 players = {}
 
@@ -52,6 +62,7 @@ class Game:
         self.started = False
         self.finished = False
         self.answers = {}
+        self.questions = load_questions()
     
     def add_player(self, player_id, player_name):
         self.players[player_id] = {
@@ -61,7 +72,7 @@ class Game:
         }
     
     def submit_answer(self, player_id, question_index, answer):
-        if answer == questions[question_index]["answer"]:
+        if answer == self.questions[question_index]["answer"]:
             self.players[player_id]["score"] += 1
         self.players[player_id]["answers"][question_index] = answer
 
@@ -75,10 +86,11 @@ def healthz():
 
 @app.route("/quiz")
 def quiz():
-    return render_template("quiz.html", questions=questions)
+    return render_template("quiz.html", questions=load_questions())
 
 @app.route("/submit", methods=["POST"])
 def submit():
+    questions = load_questions()
     score = 0
     for i, q in enumerate(questions):
         user_answer = request.form.get(f"q{i}")
@@ -120,7 +132,10 @@ def lobby(game_id):
 
 @app.route("/multiplayer_quiz/<game_id>")
 def multiplayer_quiz(game_id):
-    return render_template("multiplayer_quiz.html", game_id=game_id, questions=questions)
+    game = games.get(game_id)
+    if not game:
+        return redirect("/")
+    return render_template("multiplayer_quiz.html", game_id=game_id, questions=game.questions)
 
 @app.route("/multiplayer_result/<game_id>")
 def multiplayer_result(game_id):
@@ -135,7 +150,7 @@ def multiplayer_result(game_id):
         "started": game.started,
         "finished": game.finished
     }
-    return render_template("multiplayer_result.html", game=game_dict, game_id=game_id, questions=questions)
+    return render_template("multiplayer_result.html", game=game_dict, game_id=game_id, questions=game.questions)
 
 @socketio.on("create_game")
 def on_create_game(data):
@@ -199,7 +214,7 @@ def on_start_game(data):
     game = games[game_id]
     game.started = True
     
-    emit("game_started", {"total_questions": len(questions)}, to=game_id)
+    emit("game_started", {"total_questions": len(game.questions)}, to=game_id)
 
 @socketio.on("submit_answer")
 def on_submit_answer(data):
