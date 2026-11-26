@@ -84,6 +84,12 @@ def home():
 def healthz():
     return jsonify({"status": "ok"})
 
+@app.route("/api/questions", methods=["GET"])
+def list_questions():
+    """Return every question in the question bank."""
+    questions = Question.query.order_by(Question.id).all()
+    return jsonify([q.to_dict() for q in questions])
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=load_questions())
