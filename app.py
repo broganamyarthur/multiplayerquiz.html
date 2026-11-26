@@ -4,9 +4,12 @@ import uuid
 import random
 import os
 import secrets
+from models import db, Question
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///quiz.db')
+db.init_app(app)
 
 # Configure for production
 @app.before_request
@@ -22,6 +25,22 @@ socketio = SocketIO(
 )
 
 from questions_seed import questions
+def seed_database():
+    """Create the tables and add the starting questions if the table is empty."""
+    db.create_all()
+    if Question.query.count() == 0:
+        for q in questions:
+            db.session.add(Question(
+                text=q["question"],
+                options=q["options"],
+                answer=q["answer"],
+                image=q["image"],
+            ))
+        db.session.commit()
+
+
+with app.app_context():
+    seed_database()
 games = {}
 players = {}
 
