@@ -386,8 +386,16 @@
                 speedChallengeActive = false;
                 const seconds = ((performance.now() - speedChallengeStart) / 1000).toFixed(2);
                 const status = document.getElementById("speedStatus");
-                status.textContent = `Completed in ${seconds}s! Nice speed!`;
+                status.textContent = `Completed in ${seconds}s! +1 bonus point!`;
                 status.className = "speed-status done";
+
+                // Ask the server for the bonus point. The server only gives
+                // one bonus per player per question, however often this is sent.
+                socket.emit("colouring_complete", {
+                    game_id: gameId,
+                    player_id: playerId,
+                    question_index: currentQuestion
+                });
             }
         }
 
