@@ -4,6 +4,7 @@ import uuid
 import random
 import os
 import secrets
+import time
 from datetime import timedelta
 from functools import wraps
 from werkzeug.security import check_password_hash
@@ -90,14 +91,31 @@ def home():
 def healthz():
     return jsonify({"status": "ok"})
 
+MAX_FAILED_LOGINS = 5
+LOCKOUT_SECONDS = 15 * 60
+failed_logins = {}  # IP address -> times of recent failed sign-ins
+
+
+def is_locked_out(ip):
+    """True if this IP has 5 or more failed sign-ins in the last 15 minutes."""
+    recent = [t for t in failed_logins.get(ip, []) if time.time() - t < LOCKOUT_SECONDS]
+    failed_logins[ip] = recent
+    return len(recent) >= MAX_FAILED_LOGINS
+
+
 @app.route("/api/login", methods=["POST"])
 def login():
     """Sign in as admin if the password matches the stored hash."""
+    ip = request.remote_addr
+    if is_locked_out(ip):
+        return jsonify({"error": "Too many failed attempts. Try again later."}), 429
     data = request.get_json(silent=True) or {}
     password = str(data.get("password", ""))
     password_hash = os.environ.get("ADMIN_PASSWORD_HASH")
     if not password_hash or not check_password_hash(password_hash, password):
+        failed_logins.setdefault(ip, []).append(time.time())
         return jsonify({"error": "Incorrect password"}), 401
+    failed_logins.pop(ip, None)
     session.clear()
     session["is_admin"] = True
     session.permanent = True
