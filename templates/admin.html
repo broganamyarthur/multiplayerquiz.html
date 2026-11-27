@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz admin - Question bank</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #222;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        h1 { margin-top: 0; color: #4b3fb5; }
+        label { display: block; font-weight: 600; margin: 12px 0 4px; }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #888;
+            border-radius: 6px;
+        }
+        button {
+            padding: 10px 16px;
+            font-size: 16px;
+            border: none;
+            border-radius: 6px;
+            background: #4b3fb5;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 12px;
+        }
+        button.secondary { background: #555; }
+        button.danger { background: #b3261e; }
+        button:focus-visible, input:focus-visible, textarea:focus-visible {
+            outline: 3px solid #f5a623;
+            outline-offset: 2px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+        .message { margin-top: 12px; font-weight: 600; }
+        .message.error { color: #b3261e; }
+        .message.success { color: #1e7d32; }
+        .toolbar { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+        .toolbar > div { flex: 1; min-width: 200px; }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+<main class="container">
+    <h1>Question bank</h1>
+
+    <!-- Shown until the admin signs in -->
+    <section id="sign-in-section" aria-labelledby="sign-in-heading">
+        <h2 id="sign-in-heading">Admin sign-in</h2>
+        <form id="sign-in-form">
+            <label for="password">Password</label>
+            <input id="password" type="password" autocomplete="current-password" required>
+            <button type="submit">Sign in</button>
+        </form>
+        <p id="sign-in-message" class="message error" role="alert"></p>
+    </section>
+
+    <!-- Shown once signed in -->
+    <section id="bank-section" hidden>
+        <button id="sign-out" class="secondary" type="button">Sign out</button>
+
+        <h2 id="form-heading">Add a question</h2>
+        <form id="question-form">
+            <input id="question-id" type="hidden">
+            <label for="question-text">Question</label>
+            <input id="question-text" required maxlength="300">
+            <label for="question-options">Options (one per line, at least 2)</label>
+            <textarea id="question-options" rows="4" required></textarea>
+            <label for="question-answer">Correct answer (must match one option exactly)</label>
+            <input id="question-answer" required maxlength="200">
+            <label for="question-category">Category (optional)</label>
+            <input id="question-category" maxlength="50">
+            <button type="submit">Save question</button>
+            <button id="cancel-edit" class="secondary" type="button" hidden>Cancel edit</button>
+        </form>
+        <p id="form-message" class="message" role="status"></p>
+
+        <h2>Questions</h2>
+        <form id="search-form" class="toolbar">
+            <div>
+                <label for="search">Search by keyword</label>
+                <input id="search" type="search">
+            </div>
+            <div>
+                <label for="category-filter">Category</label>
+                <input id="category-filter">
+            </div>
+            <button type="submit">Search</button>
+        </form>
+        <table>
+            <thead>
+                <tr><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Category</th><th scope="col">Actions</th></tr>
+            </thead>
+            <tbody id="question-rows"></tbody>
+        </table>
+    </section>
+</main>
+
+<script>
+    const signInSection = document.getElementById("sign-in-section");
+    const bankSection = document.getElementById("bank-section");
+    const signInMessage = document.getElementById("sign-in-message");
+    const formMessage = document.getElementById("form-message");
+    const rows = document.getElementById("question-rows");
+    const form = document.getElementById("question-form");
+    const cancelEdit = document.getElementById("cancel-edit");
+
+    function showSignIn() {
+        signInSection.hidden = false;
+        bankSection.hidden = true;
+    }
+
+    function showBank() {
+        signInSection.hidden = true;
+        bankSection.hidden = false;
+    }
+
+    function setFormMessage(text, isError) {
+        formMessage.textContent = text;
+        formMessage.className = "message " + (isError ? "error" : "success");
+    }
+
+    // Load questions from the API. A 401 means we're not signed in.
+    async function loadQuestions() {
+        const params = new URLSearchParams();
+        const search = document.getElementById("search").value.trim();
+        const category = document.getElementById("category-filter").value.trim();
+        if (search) params.set("search", search);
+        if (category) params.set("category", category);
+
+        const response = await fetch("/api/questions?" + params.toString());
+        if (response.status === 401) {
+            showSignIn();
+            return;
+        }
+        showBank();
+        renderRows(await response.json());
+    }
+
+    // Build table rows with textContent (never innerHTML), so question text
+    // can't inject HTML or scripts into the page (prevents XSS).
+    function renderRows(questions) {
+        rows.replaceChildren();
+        for (const q of questions) {
+            const tr = document.createElement("tr");
+            for (const value of [q.text, q.answer, q.category || ""]) {
+                const td = document.createElement("td");
+                td.textContent = value;
+                tr.appendChild(td);
+            }
+            const actions = document.createElement("td");
+
+            const edit = document.createElement("button");
+            edit.type = "button";
+            edit.textContent = "Edit";
+            edit.setAttribute("aria-label", "Edit question: " + q.text);
+            edit.addEventListener("click", () => startEdit(q));
+
+            const del = document.createElement("button");
+            del.type = "button";
+            del.className = "danger";
+            del.textContent = "Delete";
+            del.setAttribute("aria-label", "Delete question: " + q.text);
+            del.addEventListener("click", () => deleteQuestion(q));
+
+            actions.append(edit, " ", del);
+            tr.appendChild(actions);
+            rows.appendChild(tr);
+        }
+    }
+
+    function startEdit(q) {
+        document.getElementById("question-id").value = q.id;
+        document.getElementById("question-text").value = q.text;
+        document.getElementById("question-options").value = q.options.join("\n");
+        document.getElementById("question-answer").value = q.answer;
+        document.getElementById("question-category").value = q.category || "";
+        document.getElementById("form-heading").textContent = "Edit question";
+        cancelEdit.hidden = false;
+        document.getElementById("question-text").focus();
+    }
+
+    function resetForm() {
+        form.reset();
+        document.getElementById("question-id").value = "";
+        document.getElementById("form-heading").textContent = "Add a question";
+        cancelEdit.hidden = true;
+    }
+
+    async function deleteQuestion(q) {
+        if (!confirm("Delete this question?\n\n" + q.text)) return;
+        const response = await fetch("/api/questions/" + q.id, { method: "DELETE" });
+        if (response.status === 204) {
+            setFormMessage("Question deleted.", false);
+            loadQuestions();
+        } else {
+            setFormMessage("Could not delete the question.", true);
+        }
+    }
+
+    document.getElementById("sign-in-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const response = await fetch("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: document.getElementById("password").value }),
+        });
+        document.getElementById("password").value = "";
+        if (response.ok) {
+            signInMessage.textContent = "";
+            loadQuestions();
+        } else if (response.status === 429) {
+            signInMessage.textContent = "Too many failed attempts. Try again in 15 minutes.";
+        } else {
+            signInMessage.textContent = "Incorrect password.";
+        }
+    });
+
+    document.getElementById("sign-out").addEventListener("click", async () => {
+        await fetch("/api/logout", { method: "POST" });
+        showSignIn();
+    });
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const id = document.getElementById("question-id").value;
+        const options = document.getElementById("question-options").value
+            .split("\n").map((o) => o.trim()).filter((o) => o);
+        const body = {
+            text: document.getElementById("question-text").value,
+            options: options,
+            answer: document.getElementById("question-answer").value.trim(),
+            category: document.getElementById("question-category").value.trim() || null,
+        };
+        const response = await fetch(id ? "/api/questions/" + id : "/api/questions", {
+            method: id ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        if (response.ok) {
+            setFormMessage(id ? "Question updated." : "Question added.", false);
+            resetForm();
+            loadQuestions();
+        } else if (response.status === 401) {
+            showSignIn();
+        } else {
+            const data = await response.json();
+            setFormMessage(data.error || "Could not save the question.", true);
+        }
+    });
+
+    cancelEdit.addEventListener("click", resetForm);
+
+    document.getElementById("search-form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        loadQuestions();
+    });
+
+    // On page load, try to load questions; this shows sign-in if needed.
+    loadQuestions();
+</script>
+</body>
+</html>
