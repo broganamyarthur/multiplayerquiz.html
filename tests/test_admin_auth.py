@@ -22,3 +22,8 @@ def test_sign_in_locks_out_after_five_failures():
         assert response.status_code == 401
     response = client.post("/api/login", json={"password": TEST_ADMIN_PASSWORD}, environ_base=attacker)
     assert response.status_code == 429
+
+def test_admin_page_loads():
+    response = app.test_client().get("/admin")
+    assert response.status_code == 200
+    assert b"Question bank" in response.data
