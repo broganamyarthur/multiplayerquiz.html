@@ -1,61 +1,18 @@
+import pytest
+
 from app import app
+from conftest import TEST_ADMIN_PASSWORD
 from models import db, Question
 from questions_seed import questions
 
 
-def test_list_questions_returns_all_questions():
-    response = app.test_client().get("/api/questions")
-    assert response.status_code == 200
-    data = response.get_json()
-    assert len(data) == len(questions)
-    assert data[0]["text"] == questions[0]["question"]
+@pytest.fixture
+def admin():
+    """A test client that is signed in as admin."""
+    client = app.test_client()
+    client.post("/api/login", json={"password": TEST_ADMIN_PASSWORD})
+    return client
 
-
-def test_get_one_question_by_id():
-    response = app.test_client().get("/api/questions/1")
-    assert response.status_code == 200
-    assert response.get_json()["text"] == questions[0]["question"]
-
-
-def test_get_missing_question_returns_404():
-    response = app.test_client().get("/api/questions/99999")
-    assert response.status_code == 404
-
-
-def test_create_question_saves_it():
-    new = {
-        "text": "What does CI stand for?",
-        "options": ["Continuous Integration", "Code Inspection"],
-        "answer": "Continuous Integration",
-        "category": "DevOps",
-    }
-    response = app.test_client().post("/api/questions", json=new)
-    assert response.status_code == 201
-    created = response.get_json()
-    assert created["text"] == new["text"]
-    with app.app_context():
-        saved = db.session.get(Question, created["id"])
-        assert saved is not None
-        db.session.delete(saved)
-        db.session.commit()
-
-
-def test_create_question_rejects_answer_not_in_options():
-    bad = {"text": "Pick one", "options": ["A", "B"], "answer": "C"}
-    response = app.test_client().post("/api/questions", json=bad)
-    assert response.status_code == 400
-
-
-def test_create_question_rejects_fewer_than_two_options():
-    bad = {"text": "Pick one", "options": ["A"], "answer": "A"}
-    response = app.test_client().post("/api/questions", json=bad)
-    assert response.status_code == 400
-
-
-def test_create_question_rejects_missing_text():
-    bad = {"text": "", "options": ["A", "B"], "answer": "A"}
-    response = app.test_client().post("/api/questions", json=bad)
-    assert response.status_code == 400
 
 def make_question():
     """Add a temporary question for a test and return its ID."""
@@ -75,49 +32,108 @@ def delete_question_if_present(question_id):
             db.session.commit()
 
 
-def test_update_question_saves_changes():
+def test_question_api_refuses_anonymous_users():
+    client = app.test_client()
+    assert client.get("/api/questions").status_code == 401
+    assert client.post("/api/questions", json={}).status_code == 401
+    assert client.put("/api/questions/99999", json={}).status_code == 401
+    assert client.delete("/api/questions/99999").status_code == 401
+
+
+def test_signing_out_removes_admin_access(admin):
+    admin.post("/api/logout")
+    assert admin.get("/api/questions").status_code == 401
+
+
+def test_list_questions_returns_all_questions(admin):
+    response = admin.get("/api/questions")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data) == len(questions)
+    assert data[0]["text"] == questions[0]["question"]
+
+
+def test_get_one_question_by_id(admin):
+    response = admin.get("/api/questions/1")
+    assert response.status_code == 200
+    assert response.get_json()["text"] == questions[0]["question"]
+
+
+def test_get_missing_question_returns_404(admin):
+    response = admin.get("/api/questions/99999")
+    assert response.status_code == 404
+
+
+def test_create_question_saves_it(admin):
+    new = {
+        "text": "What does CI stand for?",
+        "options": ["Continuous Integration", "Code Inspection"],
+        "answer": "Continuous Integration",
+        "category": "DevOps",
+    }
+    response = admin.post("/api/questions", json=new)
+    assert response.status_code == 201
+    created = response.get_json()
+    assert created["text"] == new["text"]
+    delete_question_if_present(created["id"])
+
+
+def test_create_question_rejects_answer_not_in_options(admin):
+    bad = {"text": "Pick one", "options": ["A", "B"], "answer": "C"}
+    assert admin.post("/api/questions", json=bad).status_code == 400
+
+
+def test_create_question_rejects_fewer_than_two_options(admin):
+    bad = {"text": "Pick one", "options": ["A"], "answer": "A"}
+    assert admin.post("/api/questions", json=bad).status_code == 400
+
+
+def test_create_question_rejects_missing_text(admin):
+    bad = {"text": "", "options": ["A", "B"], "answer": "A"}
+    assert admin.post("/api/questions", json=bad).status_code == 400
+
+
+def test_update_question_saves_changes(admin):
     question_id = make_question()
     changed = {"text": "Updated question", "options": ["A", "B", "C"], "answer": "C"}
-    response = app.test_client().put(f"/api/questions/{question_id}", json=changed)
+    response = admin.put(f"/api/questions/{question_id}", json=changed)
     assert response.status_code == 200
     assert response.get_json()["text"] == "Updated question"
     delete_question_if_present(question_id)
 
 
-def test_update_question_rejects_invalid_data():
+def test_update_question_rejects_invalid_data(admin):
     question_id = make_question()
     bad = {"text": "Updated", "options": ["A", "B"], "answer": "Z"}
-    response = app.test_client().put(f"/api/questions/{question_id}", json=bad)
-    assert response.status_code == 400
+    assert admin.put(f"/api/questions/{question_id}", json=bad).status_code == 400
     delete_question_if_present(question_id)
 
 
-def test_update_missing_question_returns_404():
+def test_update_missing_question_returns_404(admin):
     changed = {"text": "Updated", "options": ["A", "B"], "answer": "A"}
-    response = app.test_client().put("/api/questions/99999", json=changed)
-    assert response.status_code == 404
+    assert admin.put("/api/questions/99999", json=changed).status_code == 404
 
-def test_delete_question_removes_it():
+
+def test_delete_question_removes_it(admin):
     question_id = make_question()
-    response = app.test_client().delete(f"/api/questions/{question_id}")
-    assert response.status_code == 204
+    assert admin.delete(f"/api/questions/{question_id}").status_code == 204
     with app.app_context():
         assert db.session.get(Question, question_id) is None
 
 
-def test_delete_missing_question_returns_404():
-    response = app.test_client().delete("/api/questions/99999")
-    assert response.status_code == 404
+def test_delete_missing_question_returns_404(admin):
+    assert admin.delete("/api/questions/99999").status_code == 404
 
-def test_search_questions_by_keyword():
-    response = app.test_client().get("/api/questions?search=planet")
+
+def test_search_questions_by_keyword(admin):
+    response = admin.get("/api/questions?search=planet")
     assert response.status_code == 200
     data = response.get_json()
     assert len(data) >= 1
     assert all("planet" in q["text"].lower() for q in data)
 
 
-def test_search_questions_by_category():
+def test_search_questions_by_category(admin):
     with app.app_context():
         q = Question(text="Which tool runs our pipeline?",
                      options=["GitHub Actions", "Excel"],
@@ -125,7 +141,6 @@ def test_search_questions_by_category():
         db.session.add(q)
         db.session.commit()
         question_id = q.id
-    response = app.test_client().get("/api/questions?category=DevOps")
-    data = response.get_json()
+    data = admin.get("/api/questions?category=DevOps").get_json()
     assert [q["id"] for q in data] == [question_id]
-    delete_question_if_present(question_id)            
+    delete_question_if_present(question_id)
