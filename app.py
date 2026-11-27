@@ -86,9 +86,15 @@ def healthz():
 
 @app.route("/api/questions", methods=["GET"])
 def list_questions():
-    """Return every question in the question bank."""
-    questions = Question.query.order_by(Question.id).all()
-    return jsonify([q.to_dict() for q in questions])
+    """Return questions, optionally filtered by ?search= keyword and ?category=."""
+    query = Question.query
+    search = request.args.get("search", "").strip()
+    category = request.args.get("category", "").strip()
+    if search:
+        query = query.filter(Question.text.ilike(f"%{search}%"))
+    if category:
+        query = query.filter(Question.category == category)
+    return jsonify([q.to_dict() for q in query.order_by(Question.id).all()])
 
 @app.route("/api/questions/<int:question_id>", methods=["GET"])
 def get_question(question_id):
