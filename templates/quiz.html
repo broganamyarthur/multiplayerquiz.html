@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Single player quiz</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        body { font-family: Arial, sans-serif; padding: 20px; background: linear-gradient(135deg, #4c51bf 0%, #764ba2 100%); min-height: 100vh; }
         .container { max-width: 700px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
         h1 { color: #333; margin-bottom: 20px; }
         .progress { background: #ddd; height: 10px; border-radius: 3px; margin: 20px 0; overflow: hidden; }
-        .progress-bar { background: #667eea; height: 100%; width: 0%; transition: width 0.3s; }
-        .question-number { color: #999; font-size: 14px; }
+        .progress-bar { background: #4c51bf; height: 100%; width: 0%; transition: width 0.3s; }
+        .question-number { color: #666666; font-size: 14px; }
         .question-text { font-size: 22px; font-weight: bold; color: #333; margin: 20px 0; }
         .question-image { width: 100%; max-width: 400px; height: 250px; object-fit: cover; border-radius: 8px; margin: 15px 0; }
         .speed-challenge {
@@ -33,7 +36,7 @@
         .speed-canvas {
             width: 120px;
             height: 120px;
-            border: 2px dashed #667eea;
+            border: 2px dashed #4c51bf;
             border-radius: 8px;
             background: #fff;
             cursor: crosshair;
@@ -59,7 +62,7 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-        .option-label:hover { background: #e8f4f8; border-color: #667eea; }
+        .option-label:hover { background: #e8f4f8; border-color: #4c51bf; }
         .option-label input { margin-right: 10px; }
         .host-reaction {
             margin-top: 12px;
@@ -83,7 +86,7 @@
             margin: 10px 5px; 
             font-size: 16px; 
             cursor: pointer;
-            background: #667eea;
+            background: #4c51bf;
             color: white;
             border: none;
             border-radius: 5px;
@@ -232,8 +235,8 @@
             event.preventDefault();
 
             const point = getCanvasPoint(event);
-            speedCtx.fillStyle = "#667eea";
-            speedCtx.strokeStyle = "#667eea";
+            speedCtx.fillStyle = "#4c51bf";
+            speedCtx.strokeStyle = "#4c51bf";
             speedCtx.lineWidth = speedBrushRadius * 2;
             speedCtx.lineCap = "round";
 
