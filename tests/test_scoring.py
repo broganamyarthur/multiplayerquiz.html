@@ -78,3 +78,19 @@ def test_colouring_bonus_adds_to_correct_answer(game):
 def test_invalid_colouring_bonus_is_rejected(game, player_id, question_index):
     assert game.award_colouring_bonus(player_id, question_index) is False
     assert game.players["p1"]["score"] == 0
+
+
+def test_player_name_is_trimmed(game):
+    game.add_player("p2", "   Bob   ")
+    assert game.players["p2"]["name"] == "Bob"
+
+
+def test_long_player_name_is_cut_to_20_characters(game):
+    game.add_player("p2", "x" * 100)
+    assert len(game.players["p2"]["name"]) == 20
+
+
+@pytest.mark.parametrize("bad_name", ["", "    ", None, 12345])
+def test_missing_or_odd_player_name_becomes_player(game, bad_name):
+    game.add_player("p2", bad_name)
+    assert game.players["p2"]["name"] == "Player"
