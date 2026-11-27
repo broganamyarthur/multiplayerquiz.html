@@ -5,6 +5,7 @@ import random
 import os
 import secrets
 from datetime import timedelta
+from functools import wraps
 from werkzeug.security import check_password_hash
 from models import db, Question
 
@@ -109,7 +110,17 @@ def logout():
     session.clear()
     return jsonify({"status": "signed out"})
 
+def admin_required(view):
+    """Refuse the request with 401 unless the user is signed in as admin."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not session.get("is_admin"):
+            return jsonify({"error": "Admin sign-in required"}), 401
+        return view(*args, **kwargs)
+    return wrapper
+
 @app.route("/api/questions", methods=["GET"])
+@admin_required
 def list_questions():
     """Return questions, optionally filtered by ?search= keyword and ?category=."""
     query = Question.query
@@ -122,6 +133,7 @@ def list_questions():
     return jsonify([q.to_dict() for q in query.order_by(Question.id).all()])
 
 @app.route("/api/questions/<int:question_id>", methods=["GET"])
+@admin_required
 def get_question(question_id):
     """Return one question, or 404 if it doesn't exist."""
     question = db.get_or_404(Question, question_id)
@@ -144,6 +156,7 @@ def validate_question(data):
 
 
 @app.route("/api/questions", methods=["POST"])
+@admin_required
 def create_question():
     """Add a new question to the question bank."""
     data = request.get_json(silent=True)
@@ -162,6 +175,7 @@ def create_question():
     return jsonify(question.to_dict()), 201
 
 @app.route("/api/questions/<int:question_id>", methods=["PUT"])
+@admin_required
 def update_question(question_id):
     """Replace a question's details, after checking they are valid."""
     question = db.get_or_404(Question, question_id)
@@ -178,6 +192,7 @@ def update_question(question_id):
     return jsonify(question.to_dict())
 
 @app.route("/api/questions/<int:question_id>", methods=["DELETE"])
+@admin_required
 def delete_question(question_id):
     """Remove a question from the question bank."""
     question = db.get_or_404(Question, question_id)
