@@ -87,6 +87,11 @@ class Game:
 def home():
     return render_template("index.html")
 
+@app.route("/admin")
+def admin_page():
+    """Question bank admin page. Questions load from the API after sign-in."""
+    return render_template("admin.html")    
+
 @app.route("/healthz")
 def healthz():
     return jsonify({"status": "ok"})
