@@ -1,14 +1,21 @@
-from flask import Flask, render_template, request, jsonify, redirect
+from flask import Flask, render_template, request, jsonify, redirect, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
 import random
 import os
 import secrets
+import time
+from datetime import timedelta
+from functools import wraps
+from werkzeug.security import check_password_hash
 from models import db, Question
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///quiz.db')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
 db.init_app(app)
 
 # Configure for production
@@ -84,7 +91,54 @@ def home():
 def healthz():
     return jsonify({"status": "ok"})
 
+MAX_FAILED_LOGINS = 5
+LOCKOUT_SECONDS = 15 * 60
+failed_logins = {}  # IP address -> times of recent failed sign-ins
+
+
+def is_locked_out(ip):
+    """True if this IP has 5 or more failed sign-ins in the last 15 minutes."""
+    recent = [t for t in failed_logins.get(ip, []) if time.time() - t < LOCKOUT_SECONDS]
+    failed_logins[ip] = recent
+    return len(recent) >= MAX_FAILED_LOGINS
+
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    """Sign in as admin if the password matches the stored hash."""
+    ip = request.remote_addr
+    if is_locked_out(ip):
+        return jsonify({"error": "Too many failed attempts. Try again later."}), 429
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password", ""))
+    password_hash = os.environ.get("ADMIN_PASSWORD_HASH")
+    if not password_hash or not check_password_hash(password_hash, password):
+        failed_logins.setdefault(ip, []).append(time.time())
+        return jsonify({"error": "Incorrect password"}), 401
+    failed_logins.pop(ip, None)
+    session.clear()
+    session["is_admin"] = True
+    session.permanent = True
+    return jsonify({"status": "signed in"})
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    """Sign out by clearing the session."""
+    session.clear()
+    return jsonify({"status": "signed out"})
+
+def admin_required(view):
+    """Refuse the request with 401 unless the user is signed in as admin."""
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not session.get("is_admin"):
+            return jsonify({"error": "Admin sign-in required"}), 401
+        return view(*args, **kwargs)
+    return wrapper
+
 @app.route("/api/questions", methods=["GET"])
+@admin_required
 def list_questions():
     """Return questions, optionally filtered by ?search= keyword and ?category=."""
     query = Question.query
@@ -97,6 +151,7 @@ def list_questions():
     return jsonify([q.to_dict() for q in query.order_by(Question.id).all()])
 
 @app.route("/api/questions/<int:question_id>", methods=["GET"])
+@admin_required
 def get_question(question_id):
     """Return one question, or 404 if it doesn't exist."""
     question = db.get_or_404(Question, question_id)
@@ -119,6 +174,7 @@ def validate_question(data):
 
 
 @app.route("/api/questions", methods=["POST"])
+@admin_required
 def create_question():
     """Add a new question to the question bank."""
     data = request.get_json(silent=True)
@@ -137,6 +193,7 @@ def create_question():
     return jsonify(question.to_dict()), 201
 
 @app.route("/api/questions/<int:question_id>", methods=["PUT"])
+@admin_required
 def update_question(question_id):
     """Replace a question's details, after checking they are valid."""
     question = db.get_or_404(Question, question_id)
@@ -153,6 +210,7 @@ def update_question(question_id):
     return jsonify(question.to_dict())
 
 @app.route("/api/questions/<int:question_id>", methods=["DELETE"])
+@admin_required
 def delete_question(question_id):
     """Remove a question from the question bank."""
     question = db.get_or_404(Question, question_id)
