@@ -74,6 +74,10 @@
             updatePlayersList(players);
         });
 
+        socket.on("error", function(data) {
+            alert(data.message);
+        });
+
         socket.on("game_started", function(data) {
             console.log("Game started, redirecting...");
             window.location.href = "/multiplayer_quiz/" + gameId;
@@ -93,7 +97,7 @@
 
         function startGame() {
             console.log("Start game clicked!");
-            socket.emit("start_game", { game_id: gameId });
+            socket.emit("start_game", { game_id: gameId, player_id: playerId });
         }
 
         function copyGameId() {

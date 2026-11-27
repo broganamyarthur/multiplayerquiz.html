@@ -82,8 +82,11 @@ class Game:
         self.answers = {}
         self.questions = load_questions()
         self.colouring_bonuses = {}  # player ID -> question numbers already given a bonus
+        self.host_id = None  # the first player to join; only they can control the game
     
     def add_player(self, player_id, player_name):
+        if self.host_id is None:
+            self.host_id = player_id
         self.players[player_id] = {
             "name": clean_player_name(player_name),
             "score": 0,
@@ -108,7 +111,28 @@ class Game:
             app.logger.warning("Rejected %s with invalid question index %r in game %s",
                                action, question_index, self.game_id)
             return None
+        if question_index != self.current_question:
+            app.logger.info("Rejected %s for closed question %s in game %s",
+                            action, question_index, self.game_id)
+            return None
         return player
+
+    def is_host(self, player_id):
+        """True if this player created the game and so controls it."""
+        return player_id is not None and player_id == self.host_id
+
+    def next_question(self, player_id):
+        """Move everyone to the next question. Only the host can, and not past the last one."""
+        if not self.is_host(player_id):
+            return False
+        if self.current_question + 1 >= len(self.questions):
+            return False
+        self.current_question += 1
+        return True
+
+    def answer_count(self):
+        """How many players have answered the current question."""
+        return sum(1 for p in self.players.values() if self.current_question in p["answers"])
 
     def submit_answer(self, player_id, question_index, answer):
         """Record a player's first answer to a question. Returns False if rejected."""
@@ -325,7 +349,8 @@ def multiplayer_quiz(game_id):
     game = games.get(game_id)
     if not game:
         return redirect("/")
-    return render_template("multiplayer_quiz.html", game_id=game_id, questions=game.questions)
+    return render_template("multiplayer_quiz.html", game_id=game_id, questions=game.questions,
+                           host_id=game.host_id, current_question=game.current_question)
 
 @app.route("/multiplayer_result/<game_id>")
 def multiplayer_result(game_id):
@@ -408,6 +433,9 @@ def on_start_game(data):
         return
     
     game = games[game_id]
+    if not game.is_host(data.get("player_id")):
+        emit("error", {"message": "Only the host can start the game"})
+        return
     game.started = True
     
     emit("game_started", {"total_questions": len(game.questions)}, to=game_id)
@@ -430,6 +458,23 @@ def on_submit_answer(data):
     
     # Broadcast updated leaderboard to all players in game
     emit("leaderboard_update", {"players": game.players}, to=game_id)
+    # Let the host see how many players have answered this question
+    emit("answer_count", {"question_index": game.current_question,
+                          "answered": game.answer_count(),
+                          "players": len(game.players)}, to=game_id)
+
+
+@socketio.on("next_question")
+def on_next_question(data):
+    """The host moves everyone on to the next question at the same time."""
+    game = games.get(data.get("game_id"))
+    if game is None:
+        emit("error", {"message": "Game not found"})
+        return
+    if not game.next_question(data.get("player_id")):
+        emit("error", {"message": "Only the host can move to the next question"})
+        return
+    emit("show_question", {"question_index": game.current_question}, to=game.game_id)
 
 
 @socketio.on("colouring_complete")
@@ -444,22 +489,20 @@ def on_colouring_complete(data):
 
 @socketio.on("finish_game")
 def on_finish_game(data):
+    """The host ends the game and everyone goes to the results page."""
     game_id = data.get("game_id")
-    
-    print(f"Finish game request for: {game_id}")
-    print(f"Available games: {list(games.keys())}")
-    
     if game_id not in games:
         emit("error", {"message": "Game not found"})
         return
-    
+
     game = games[game_id]
+    if not game.is_host(data.get("player_id")):
+        emit("error", {"message": "Only the host can finish the game"})
+        return
     game.finished = True
-    
-    # Sort players by score
+
     sorted_players = sorted(game.players.items(), key=lambda x: x[1]["score"], reverse=True)
-    
-    print(f"Emitting game_finished to room {game_id}")
+    app.logger.info("Game %s finished", game_id)
     emit("game_finished", {"results": sorted_players}, to=game_id)
 
 if __name__ == "__main__":
