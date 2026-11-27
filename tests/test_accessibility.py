@@ -35,9 +35,12 @@ class PageChecker(HTMLParser):
         self.inputs = []          # (attributes, wrapped in a <label>?)
         self.label_targets = set()
         self.label_depth = 0
+        self.has_main = False
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
+        if tag == "main" or a.get("role") == "main":
+            self.has_main = True
         if tag == "html":
             self.lang = a.get("lang")
         elif tag == "title":
@@ -105,3 +108,8 @@ def test_page_fits_phone_screens(page_name):
 @pytest.mark.parametrize("page_name", PAGES)
 def test_every_input_has_a_label(page_name):
     assert check(page_name).unlabelled_inputs() == []
+
+
+@pytest.mark.parametrize("page_name", PAGES)
+def test_page_marks_its_main_content(page_name):
+    assert check(page_name).has_main
