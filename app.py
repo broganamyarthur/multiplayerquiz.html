@@ -58,6 +58,17 @@ def load_questions():
         {"question": q.text, "options": q.options, "answer": q.answer, "image": q.image}
         for q in Question.query.order_by(Question.id).all()
     ]
+MAX_NAME_LENGTH = 20
+
+
+def clean_player_name(name):
+    """Trim a player's display name, cap its length, and fall back to "Player" if blank."""
+    if not isinstance(name, str):
+        return "Player"
+    name = name.strip()[:MAX_NAME_LENGTH]
+    return name or "Player"
+
+
 games = {}
 players = {}
 
@@ -74,7 +85,7 @@ class Game:
     
     def add_player(self, player_id, player_name):
         self.players[player_id] = {
-            "name": player_name,
+            "name": clean_player_name(player_name),
             "score": 0,
             "answers": {}
         }

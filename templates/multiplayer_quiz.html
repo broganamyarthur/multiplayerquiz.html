@@ -412,22 +412,30 @@
             reactionEl.className = "host-reaction";
             reactionEl.textContent = "";
             
-            // Display question image if available
-            let imageHtml = "";
+            // Build the image and options with DOM methods and textContent rather
+            // than HTML strings, so question text can't inject scripts (prevents XSS).
+            const optionsContainer = document.getElementById("optionsContainer");
+            optionsContainer.replaceChildren();
+
             if (question.image) {
-                imageHtml = `<img src="${question.image}" style="width: 100%; max-width: 400px; height: 250px; object-fit: cover; border-radius: 8px; margin: 15px 0;" />`;
+                const img = document.createElement("img");
+                img.src = question.image;
+                img.alt = "";
+                img.style.cssText = "width: 100%; max-width: 400px; height: 250px; object-fit: cover; border-radius: 8px; margin: 15px 0;";
+                optionsContainer.appendChild(img);
             }
-            
-            let optionsHtml = imageHtml;
+
             question.options.forEach(opt => {
-                optionsHtml += `
-                    <label class="option-label">
-                        <input type="radio" name="answer" value="${opt}" onchange="selectAnswer('${opt}')">
-                        ${opt}
-                    </label>
-                `;
+                const label = document.createElement("label");
+                label.className = "option-label";
+                const input = document.createElement("input");
+                input.type = "radio";
+                input.name = "answer";
+                input.value = opt;
+                input.addEventListener("change", () => selectAnswer(opt));
+                label.append(input, " ", opt);
+                optionsContainer.appendChild(label);
             });
-            document.getElementById("optionsContainer").innerHTML = optionsHtml;
             
             const progress = ((index) / questions.length) * 100;
             document.getElementById("progressBar").style.width = progress + "%";
@@ -522,28 +530,37 @@
                 .map(([id, player]) => ({ id, ...player }))
                 .sort((a, b) => b.score - a.score);
             
-            let html = "";
+            // Build each row with textContent so player names show as plain text,
+            // even if someone types HTML or script into their name (prevents XSS).
+            leaderboard.replaceChildren();
             const avatarEmojis = ["🎯", "⭐", "🚀", "💎", "🔥", "👑", "🎪", "🌟"];
-            
+            const medals = ["🥇", "🥈", "🥉"];
+
             sortedPlayers.forEach((player, index) => {
-                const medals = ["🥇", "🥈", "🥉"];
-                const medal = medals[index] || "";
-                const isLeader = index === 0;
-                const avatarEmoji = avatarEmojis[index % avatarEmojis.length];
-                
-                html += `
-                    <div class="leaderboard-item ${isLeader ? 'leader' : ''}">
-                        <span class="medal">${medal}</span>
-                        <div class="player-info">
-                            <div class="player-avatar">${avatarEmoji}</div>
-                            <span class="player-name">${player.name}</span>
-                        </div>
-                        <span class="player-score">${player.score}</span>
-                    </div>
-                `;
+                const item = document.createElement("div");
+                item.className = "leaderboard-item" + (index === 0 ? " leader" : "");
+
+                const medal = document.createElement("span");
+                medal.className = "medal";
+                medal.textContent = medals[index] || "";
+
+                const info = document.createElement("div");
+                info.className = "player-info";
+                const avatar = document.createElement("div");
+                avatar.className = "player-avatar";
+                avatar.textContent = avatarEmojis[index % avatarEmojis.length];
+                const name = document.createElement("span");
+                name.className = "player-name";
+                name.textContent = player.name;
+                info.append(avatar, name);
+
+                const score = document.createElement("span");
+                score.className = "player-score";
+                score.textContent = player.score;
+
+                item.append(medal, info, score);
+                leaderboard.appendChild(item);
             });
-            
-            leaderboard.innerHTML = html;
         }
     </script>
 </body>
