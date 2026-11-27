@@ -56,3 +56,43 @@ def test_create_question_rejects_missing_text():
     bad = {"text": "", "options": ["A", "B"], "answer": "A"}
     response = app.test_client().post("/api/questions", json=bad)
     assert response.status_code == 400
+
+def make_question():
+    """Add a temporary question for a test and return its ID."""
+    with app.app_context():
+        q = Question(text="Temporary question", options=["A", "B"], answer="A")
+        db.session.add(q)
+        db.session.commit()
+        return q.id
+
+
+def delete_question_if_present(question_id):
+    """Remove a temporary question so other tests aren't affected."""
+    with app.app_context():
+        q = db.session.get(Question, question_id)
+        if q:
+            db.session.delete(q)
+            db.session.commit()
+
+
+def test_update_question_saves_changes():
+    question_id = make_question()
+    changed = {"text": "Updated question", "options": ["A", "B", "C"], "answer": "C"}
+    response = app.test_client().put(f"/api/questions/{question_id}", json=changed)
+    assert response.status_code == 200
+    assert response.get_json()["text"] == "Updated question"
+    delete_question_if_present(question_id)
+
+
+def test_update_question_rejects_invalid_data():
+    question_id = make_question()
+    bad = {"text": "Updated", "options": ["A", "B"], "answer": "Z"}
+    response = app.test_client().put(f"/api/questions/{question_id}", json=bad)
+    assert response.status_code == 400
+    delete_question_if_present(question_id)
+
+
+def test_update_missing_question_returns_404():
+    changed = {"text": "Updated", "options": ["A", "B"], "answer": "A"}
+    response = app.test_client().put("/api/questions/99999", json=changed)
+    assert response.status_code == 404    
