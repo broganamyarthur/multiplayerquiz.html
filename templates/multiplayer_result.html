@@ -67,52 +67,65 @@
         const gameId = "{{ game_id }}";
         const socket = io();
         const game = {{ game | tojson }};
-        const totalQuestions = 35;
         
         console.log("Game object:", game);
         
+        function showMessage(container, text) {
+            const p = document.createElement("p");
+            p.style.textAlign = "center";
+            p.textContent = text;
+            container.replaceChildren(p);
+        }
+
         function displayResults() {
             const leaderboard = document.getElementById("leaderboard");
-            
+
             if (!game || !game.players) {
-                leaderboard.innerHTML = "<p style='text-align: center;'>Error loading results. Please try again.</p>";
+                showMessage(leaderboard, "Error loading results. Please try again.");
                 return;
             }
-            
-            let html = "";
-            let rank = 1;
+
             const medals = ["🥇", "🥈", "🥉"];
-            
+            const avatarEmojis = ["🎯", "⭐", "🚀", "💎", "🔥", "👑", "🎪", "🌟"];
+
             try {
-                // Sort players by score
                 const sortedPlayers = Object.entries(game.players).sort((a, b) => b[1].score - a[1].score);
-                
-                console.log("Sorted players:", sortedPlayers);
-                
+                leaderboard.replaceChildren();
+
+                // Build each row with textContent so player names show as plain
+                // text, even if they contain HTML or script (prevents XSS).
                 sortedPlayers.forEach(([id, player], index) => {
-                    const medal = medals[index] || "";
-                    const firstLetter = player.name.charAt(0).toUpperCase();
-                    const avatarEmojis = ["🎯", "⭐", "🚀", "💎", "🔥", "👑", "🎪", "🌟"];
-                    const avatarEmoji = avatarEmojis[index % avatarEmojis.length];
-                    
-                    html += `
-                        <div class="leaderboard-item">
-                            <span class="medal">${medal}</span>
-                            <span class="rank">#${rank}</span>
-                            <div class="player-info">
-                                <div class="player-avatar">${avatarEmoji}</div>
-                                <span class="player-name">${player.name}</span>
-                            </div>
-                            <span class="score">${player.score}/${totalQuestions}</span>
-                        </div>
-                    `;
-                    rank++;
+                    const item = document.createElement("div");
+                    item.className = "leaderboard-item";
+
+                    const medal = document.createElement("span");
+                    medal.className = "medal";
+                    medal.textContent = medals[index] || "";
+
+                    const rank = document.createElement("span");
+                    rank.className = "rank";
+                    rank.textContent = "#" + (index + 1);
+
+                    const info = document.createElement("div");
+                    info.className = "player-info";
+                    const avatar = document.createElement("div");
+                    avatar.className = "player-avatar";
+                    avatar.textContent = avatarEmojis[index % avatarEmojis.length];
+                    const name = document.createElement("span");
+                    name.className = "player-name";
+                    name.textContent = player.name;
+                    info.append(avatar, name);
+
+                    const score = document.createElement("span");
+                    score.className = "score";
+                    score.textContent = player.score + " points";
+
+                    item.append(medal, rank, info, score);
+                    leaderboard.appendChild(item);
                 });
-                
-                leaderboard.innerHTML = html;
             } catch (error) {
                 console.error("Error displaying results:", error);
-                leaderboard.innerHTML = "<p style='text-align: center;'>Error displaying results: " + error.message + "</p>";
+                showMessage(leaderboard, "Error displaying results: " + error.message);
             }
         }
         
