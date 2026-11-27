@@ -84,6 +84,82 @@ def home():
 def healthz():
     return jsonify({"status": "ok"})
 
+@app.route("/api/questions", methods=["GET"])
+def list_questions():
+    """Return questions, optionally filtered by ?search= keyword and ?category=."""
+    query = Question.query
+    search = request.args.get("search", "").strip()
+    category = request.args.get("category", "").strip()
+    if search:
+        query = query.filter(Question.text.ilike(f"%{search}%"))
+    if category:
+        query = query.filter(Question.category == category)
+    return jsonify([q.to_dict() for q in query.order_by(Question.id).all()])
+
+@app.route("/api/questions/<int:question_id>", methods=["GET"])
+def get_question(question_id):
+    """Return one question, or 404 if it doesn't exist."""
+    question = db.get_or_404(Question, question_id)
+    return jsonify(question.to_dict())
+
+def validate_question(data):
+    """Return an error message if the question data is invalid, otherwise None."""
+    if not isinstance(data, dict):
+        return "Request body must be JSON"
+    text = (data.get("text") or "").strip()
+    options = data.get("options")
+    answer = data.get("answer")
+    if not text:
+        return "Question text is required"
+    if not isinstance(options, list) or len(options) < 2:
+        return "At least 2 options are required"
+    if answer not in options:
+        return "The answer must be one of the options"
+    return None
+
+
+@app.route("/api/questions", methods=["POST"])
+def create_question():
+    """Add a new question to the question bank."""
+    data = request.get_json(silent=True)
+    error = validate_question(data)
+    if error:
+        return jsonify({"error": error}), 400
+    question = Question(
+        text=data["text"].strip(),
+        options=data["options"],
+        answer=data["answer"],
+        image=data.get("image"),
+        category=data.get("category"),
+    )
+    db.session.add(question)
+    db.session.commit()
+    return jsonify(question.to_dict()), 201
+
+@app.route("/api/questions/<int:question_id>", methods=["PUT"])
+def update_question(question_id):
+    """Replace a question's details, after checking they are valid."""
+    question = db.get_or_404(Question, question_id)
+    data = request.get_json(silent=True)
+    error = validate_question(data)
+    if error:
+        return jsonify({"error": error}), 400
+    question.text = data["text"].strip()
+    question.options = data["options"]
+    question.answer = data["answer"]
+    question.image = data.get("image")
+    question.category = data.get("category")
+    db.session.commit()
+    return jsonify(question.to_dict())
+
+@app.route("/api/questions/<int:question_id>", methods=["DELETE"])
+def delete_question(question_id):
+    """Remove a question from the question bank."""
+    question = db.get_or_404(Question, question_id)
+    db.session.delete(question)
+    db.session.commit()
+    return "", 204
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=load_questions())
