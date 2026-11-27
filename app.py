@@ -130,6 +130,22 @@ def create_question():
     db.session.commit()
     return jsonify(question.to_dict()), 201
 
+@app.route("/api/questions/<int:question_id>", methods=["PUT"])
+def update_question(question_id):
+    """Replace a question's details, after checking they are valid."""
+    question = db.get_or_404(Question, question_id)
+    data = request.get_json(silent=True)
+    error = validate_question(data)
+    if error:
+        return jsonify({"error": error}), 400
+    question.text = data["text"].strip()
+    question.options = data["options"]
+    question.answer = data["answer"]
+    question.image = data.get("image")
+    question.category = data.get("category")
+    db.session.commit()
+    return jsonify(question.to_dict())
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=load_questions())
