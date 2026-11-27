@@ -79,9 +79,26 @@ class Game:
         }
     
     def submit_answer(self, player_id, question_index, answer):
+        """Record a player's first answer to a question. Returns False if rejected."""
+        player = self.players.get(player_id)
+        if player is None:
+            app.logger.warning("Rejected answer from unknown player in game %s", self.game_id)
+            return False
+        valid_index = (
+            isinstance(question_index, int)
+            and not isinstance(question_index, bool)
+            and 0 <= question_index < len(self.questions)
+        )
+        if not valid_index:
+            app.logger.warning("Rejected answer with invalid question index %r in game %s",
+                               question_index, self.game_id)
+            return False
+        if question_index in player["answers"]:
+            return False  # first answer stands
+        player["answers"][question_index] = answer
         if answer == self.questions[question_index]["answer"]:
-            self.players[player_id]["score"] += 1
-        self.players[player_id]["answers"][question_index] = answer
+            player["score"] += 1
+        return True
 
 @app.route("/")
 def home():
@@ -367,7 +384,9 @@ def on_submit_answer(data):
         return
     
     game = games[game_id]
-    game.submit_answer(player_id, question_index, answer)
+    if not game.submit_answer(player_id, question_index, answer):
+        emit("error", {"message": "Answer not accepted"})
+        return
     
     # Broadcast updated leaderboard to all players in game
     emit("leaderboard_update", {"players": game.players}, to=game_id)

@@ -1,0 +1,45 @@
+import pytest
+
+from app import app, Game
+
+
+@pytest.fixture
+def game():
+    """A fresh game with one player, Alice (p1)."""
+    with app.app_context():
+        g = Game("test-game")
+    g.add_player("p1", "Alice")
+    return g
+
+
+def test_correct_answer_scores_one_point(game):
+    correct = game.questions[0]["answer"]
+    assert game.submit_answer("p1", 0, correct) is True
+    assert game.players["p1"]["score"] == 1
+
+
+def test_answering_same_question_twice_does_not_add_points(game):
+    correct = game.questions[0]["answer"]
+    game.submit_answer("p1", 0, correct)
+    game.submit_answer("p1", 0, correct)
+    assert game.players["p1"]["score"] == 1
+
+
+def test_first_answer_stands_when_player_changes_their_answer(game):
+    correct = game.questions[0]["answer"]
+    game.submit_answer("p1", 0, "definitely wrong")
+    game.submit_answer("p1", 0, correct)
+    assert game.players["p1"]["score"] == 0
+    assert game.players["p1"]["answers"][0] == "definitely wrong"
+
+
+@pytest.mark.parametrize("player_id, question_index", [
+    ("nobody", 0),     # unknown player
+    ("p1", 999),       # question number too big
+    ("p1", -1),        # negative question number
+    ("p1", "zero"),    # not a number
+    ("p1", None),      # missing
+])
+def test_invalid_answers_are_rejected_without_crashing(game, player_id, question_index):
+    assert game.submit_answer(player_id, question_index, "anything") is False
+    assert game.players["p1"]["score"] == 0
