@@ -68,6 +68,9 @@
         }
         
         .question-container { margin: 30px 0; }
+        .answer-count { margin-top: 12px; font-weight: bold; color: #3b4da1; }
+        #waitingMessage { color: #555; font-style: italic; }
+        [hidden] { display: none !important; }
         .question-number { color: #999; font-size: 14px; }
         .question-text { 
             font-size: 24px; 
@@ -210,11 +213,13 @@
                 <div class="question-text" id="questionText">Loading...</div>
                 <div class="options" id="optionsContainer"></div>
                 <div class="host-reaction" id="hostReaction"></div>
+                <div class="answer-count" id="answerCount" aria-live="polite" hidden></div>
             </div>
             
             <div class="btn-container">
-                <button class="btn" id="nextBtn" onclick="nextQuestion()" disabled>Next Question</button>
-                <button class="btn" onclick="finishQuizClick()" id="finishBtn">Finish Quiz</button>
+                <button class="btn" id="nextBtn" onclick="nextQuestion()" hidden>Next Question</button>
+                <button class="btn" onclick="finishQuizClick()" id="finishBtn" hidden>Finish Quiz</button>
+                <p id="waitingMessage" hidden>The host will move everyone on to the next question.</p>
             </div>
         </div>
         
@@ -228,6 +233,9 @@
         const gameId = "{{ game_id }}";
         const socket = io();
         const questions = {{ questions | tojson }};
+        const hostId = {{ host_id | tojson }};
+        const startQuestion = {{ current_question | tojson }};
+        let isHost = false;
         let currentQuestion = 0;
         let playerId = null;
         let answers = {};
@@ -262,6 +270,13 @@
                 sessionStorage.setItem("playerId", playerId);
             }
             
+            // Only the host gets the Next and Finish buttons; everyone else waits.
+            isHost = playerId === hostId;
+            document.getElementById("nextBtn").hidden = !isHost;
+            document.getElementById("finishBtn").hidden = !isHost;
+            document.getElementById("waitingMessage").hidden = isHost;
+            document.getElementById("answerCount").hidden = !isHost;
+
             // Join the game room
             socket.emit("join_room", { game_id: gameId });
             
@@ -274,6 +289,17 @@
             updateLeaderboard(data.players);
         });
 
+        // The host moved everyone on: show the same question on every screen.
+        socket.on("show_question", function(data) {
+            loadQuestion(data.question_index);
+        });
+
+        socket.on("answer_count", function(data) {
+            if (!isHost || data.question_index !== currentQuestion) return;
+            document.getElementById("answerCount").textContent =
+                `${data.answered} of ${data.players} players have answered`;
+        });
+
         socket.on("game_finished", function(data) {
             console.log("Game finished!");
             clearInterval(timerInterval);
@@ -283,7 +309,7 @@
         function init() {
             console.log("Loading questions...", questions.length);
             initSpeedChallenge();
-            loadQuestion(0);
+            loadQuestion(startQuestion);
             startTimer();
         }
 
@@ -440,7 +466,9 @@
             const progress = ((index) / questions.length) * 100;
             document.getElementById("progressBar").style.width = progress + "%";
             
-            document.getElementById("nextBtn").disabled = true;
+            if (isHost) {
+                document.getElementById("answerCount").textContent = "0 players have answered";
+            }
             resetTimer();
         }
 
@@ -451,7 +479,6 @@
 
         function selectAnswer(answer) {
             answers[currentQuestion] = answer;
-            document.getElementById("nextBtn").disabled = false;
 
             const isCorrect = answer === questions[currentQuestion].answer;
             const reactionEl = document.getElementById("hostReaction");
@@ -472,12 +499,22 @@
             });
         }
 
+        // Host only: ask the server to move everyone on. Every screen (including
+        // the host's) changes when the server broadcasts "show_question".
         function nextQuestion() {
+            if (!isHost) return;
             if (currentQuestion + 1 < questions.length) {
-                loadQuestion(currentQuestion + 1);
+                socket.emit("next_question", { game_id: gameId, player_id: playerId });
             } else {
                 finishQuiz();
             }
+        }
+
+        // Stop this player answering once the question's time is up.
+        function lockAnswers() {
+            document.querySelectorAll('input[name="answer"]').forEach((input) => {
+                input.disabled = true;
+            });
         }
 
         function finishQuizClick() {
@@ -493,7 +530,7 @@
         function finishQuiz() {
             clearInterval(timerInterval);
             console.log("Emitting finish_game for gameId:", gameId);
-            socket.emit("finish_game", { game_id: gameId }, function(ack) {
+            socket.emit("finish_game", { game_id: gameId, player_id: playerId }, function(ack) {
                 console.log("Finish game acknowledged:", ack);
             });
         }
@@ -514,11 +551,10 @@
                 
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    // Auto-advance to next question
-                    if (currentQuestion + 1 < questions.length) {
+                    lockAnswers();
+                    // When time runs out, the host's page moves everyone on together.
+                    if (isHost) {
                         nextQuestion();
-                    } else {
-                        finishQuiz();
                     }
                 }
             }, 1000);
