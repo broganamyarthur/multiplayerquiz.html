@@ -95,4 +95,16 @@ def test_update_question_rejects_invalid_data():
 def test_update_missing_question_returns_404():
     changed = {"text": "Updated", "options": ["A", "B"], "answer": "A"}
     response = app.test_client().put("/api/questions/99999", json=changed)
-    assert response.status_code == 404    
+    assert response.status_code == 404
+
+def test_delete_question_removes_it():
+    question_id = make_question()
+    response = app.test_client().delete(f"/api/questions/{question_id}")
+    assert response.status_code == 204
+    with app.app_context():
+        assert db.session.get(Question, question_id) is None
+
+
+def test_delete_missing_question_returns_404():
+    response = app.test_client().delete("/api/questions/99999")
+    assert response.status_code == 404        
