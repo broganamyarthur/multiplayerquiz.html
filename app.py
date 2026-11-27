@@ -146,6 +146,14 @@ def update_question(question_id):
     db.session.commit()
     return jsonify(question.to_dict())
 
+@app.route("/api/questions/<int:question_id>", methods=["DELETE"])
+def delete_question(question_id):
+    """Remove a question from the question bank."""
+    question = db.get_or_404(Question, question_id)
+    db.session.delete(question)
+    db.session.commit()
+    return "", 204
+
 @app.route("/quiz")
 def quiz():
     return render_template("quiz.html", questions=load_questions())
