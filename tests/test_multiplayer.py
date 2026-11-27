@@ -67,3 +67,40 @@ def test_host_is_told_how_many_players_have_answered():
     guest.emit("submit_answer", {"game_id": created["game_id"], "player_id": guest_id,
                                  "question_index": 0, "answer": "anything"})
     assert last_event(host, "answer_count") == {"question_index": 0, "answered": 1, "players": 2}
+
+
+# --- US-01 and US-02: hosting and joining (these check behaviour that already works) ---
+
+def test_host_is_given_a_join_code():
+    host = socketio.test_client(app)
+    host.emit("create_game", {"player_name": "Alice"})
+    created = last_event(host, "game_created")
+    assert len(created["game_id"]) == 8
+    assert created["game_id"] in games
+
+
+def test_joining_with_a_wrong_code_gives_an_error():
+    client = socketio.test_client(app)
+    client.emit("join_game", {"game_id": "nope", "player_name": "Bob"})
+    assert last_event(client, "error") == {"message": "Game not found"}
+
+
+def test_nobody_can_join_after_the_game_starts():
+    host, guest, created = host_and_guest()
+    host.emit("start_game", {"game_id": created["game_id"], "player_id": created["player_id"]})
+    late = socketio.test_client(app)
+    late.emit("join_game", {"game_id": created["game_id"], "player_name": "Cara"})
+    assert last_event(late, "error") == {"message": "Game already started"}
+
+
+# --- US-04: leaderboard ---
+
+def test_everyone_gets_the_updated_leaderboard_after_an_answer():
+    host, guest, created = host_and_guest()
+    guest_id = last_event(guest, "joined_game")["player_id"]
+    correct = games[created["game_id"]].questions[0]["answer"]
+    host.get_received()
+    guest.emit("submit_answer", {"game_id": created["game_id"], "player_id": guest_id,
+                                 "question_index": 0, "answer": correct})
+    update = last_event(host, "leaderboard_update")
+    assert update["players"][guest_id]["score"] == 1
