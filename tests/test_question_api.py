@@ -107,4 +107,25 @@ def test_delete_question_removes_it():
 
 def test_delete_missing_question_returns_404():
     response = app.test_client().delete("/api/questions/99999")
-    assert response.status_code == 404        
+    assert response.status_code == 404
+
+def test_search_questions_by_keyword():
+    response = app.test_client().get("/api/questions?search=planet")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert len(data) >= 1
+    assert all("planet" in q["text"].lower() for q in data)
+
+
+def test_search_questions_by_category():
+    with app.app_context():
+        q = Question(text="Which tool runs our pipeline?",
+                     options=["GitHub Actions", "Excel"],
+                     answer="GitHub Actions", category="DevOps")
+        db.session.add(q)
+        db.session.commit()
+        question_id = q.id
+    response = app.test_client().get("/api/questions?category=DevOps")
+    data = response.get_json()
+    assert [q["id"] for q in data] == [question_id]
+    delete_question_if_present(question_id)            
