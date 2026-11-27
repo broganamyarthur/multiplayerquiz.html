@@ -1,14 +1,19 @@
-from flask import Flask, render_template, request, jsonify, redirect
+from flask import Flask, render_template, request, jsonify, redirect, session
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import uuid
 import random
 import os
 import secrets
+from datetime import timedelta
+from werkzeug.security import check_password_hash
 from models import db, Question
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///quiz.db')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=2)
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', 'false').lower() == 'true'
 db.init_app(app)
 
 # Configure for production
@@ -83,6 +88,26 @@ def home():
 @app.route("/healthz")
 def healthz():
     return jsonify({"status": "ok"})
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    """Sign in as admin if the password matches the stored hash."""
+    data = request.get_json(silent=True) or {}
+    password = str(data.get("password", ""))
+    password_hash = os.environ.get("ADMIN_PASSWORD_HASH")
+    if not password_hash or not check_password_hash(password_hash, password):
+        return jsonify({"error": "Incorrect password"}), 401
+    session.clear()
+    session["is_admin"] = True
+    session.permanent = True
+    return jsonify({"status": "signed in"})
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    """Sign out by clearing the session."""
+    session.clear()
+    return jsonify({"status": "signed out"})
 
 @app.route("/api/questions", methods=["GET"])
 def list_questions():
