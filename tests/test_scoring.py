@@ -58,6 +58,7 @@ def test_colouring_same_question_twice_only_counts_once(game):
 
 def test_colouring_bonus_is_given_for_each_question(game):
     game.award_colouring_bonus("p1", 0)
+    game.next_question("p1")  # p1 is the host, so can move everyone on
     game.award_colouring_bonus("p1", 1)
     assert game.players["p1"]["score"] == 2
 
