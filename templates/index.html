@@ -278,7 +278,7 @@
             }
             
             socket.emit("join_game", { game_id: gameId, player_name: playerName });
-            socket.on("player_joined", function(data) {
+            socket.on("joined_game", function(data) {
                 sessionStorage.setItem("playerId", data.player_id);
                 sessionStorage.setItem("playerName", playerName);
                 window.location.href = "/lobby/" + gameId;
