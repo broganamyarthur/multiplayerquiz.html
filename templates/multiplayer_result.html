@@ -17,6 +17,7 @@
             border-left: 4px solid #667eea;
         }
         .rank { font-weight: bold; color: #666; min-width: 30px; }
+        .leaderboard-item.winner { background: #fff3cd; border-left-color: #ffc107; }
         .player-info { display: flex; align-items: center; gap: 12px; flex-grow: 1; }
         .player-avatar { 
             width: 40px; 
@@ -66,9 +67,8 @@
     <script>
         const gameId = "{{ game_id }}";
         const socket = io();
-        const game = {{ game | tojson }};
-        
-        console.log("Game object:", game);
+        // Players already sorted and ranked by the server; tied players share a rank.
+        const ranked = {{ ranked | tojson }};
         
         function showMessage(container, text) {
             const p = document.createElement("p");
@@ -80,53 +80,51 @@
         function displayResults() {
             const leaderboard = document.getElementById("leaderboard");
 
-            if (!game || !game.players) {
+            if (!ranked || ranked.length === 0) {
                 showMessage(leaderboard, "Error loading results. Please try again.");
                 return;
             }
 
-            const medals = ["🥇", "🥈", "🥉"];
+            const medals = { 1: "🥇", 2: "🥈", 3: "🥉" };
             const avatarEmojis = ["🎯", "⭐", "🚀", "💎", "🔥", "👑", "🎪", "🌟"];
+            const playersPerRank = {};
+            ranked.forEach((p) => { playersPerRank[p.rank] = (playersPerRank[p.rank] || 0) + 1; });
 
-            try {
-                const sortedPlayers = Object.entries(game.players).sort((a, b) => b[1].score - a[1].score);
-                leaderboard.replaceChildren();
+            leaderboard.replaceChildren();
 
-                // Build each row with textContent so player names show as plain
-                // text, even if they contain HTML or script (prevents XSS).
-                sortedPlayers.forEach(([id, player], index) => {
-                    const item = document.createElement("div");
-                    item.className = "leaderboard-item";
+            // Build each row with textContent so player names show as plain
+            // text, even if they contain HTML or script (prevents XSS).
+            ranked.forEach((player, index) => {
+                const isTie = playersPerRank[player.rank] > 1;
 
-                    const medal = document.createElement("span");
-                    medal.className = "medal";
-                    medal.textContent = medals[index] || "";
+                const item = document.createElement("div");
+                item.className = "leaderboard-item" + (player.rank === 1 ? " winner" : "");
 
-                    const rank = document.createElement("span");
-                    rank.className = "rank";
-                    rank.textContent = "#" + (index + 1);
+                const medal = document.createElement("span");
+                medal.className = "medal";
+                medal.textContent = medals[player.rank] || "";
 
-                    const info = document.createElement("div");
-                    info.className = "player-info";
-                    const avatar = document.createElement("div");
-                    avatar.className = "player-avatar";
-                    avatar.textContent = avatarEmojis[index % avatarEmojis.length];
-                    const name = document.createElement("span");
-                    name.className = "player-name";
-                    name.textContent = player.name;
-                    info.append(avatar, name);
+                const rank = document.createElement("span");
+                rank.className = "rank";
+                rank.textContent = (isTie ? "Joint #" : "#") + player.rank;
 
-                    const score = document.createElement("span");
-                    score.className = "score";
-                    score.textContent = player.score + " points";
+                const info = document.createElement("div");
+                info.className = "player-info";
+                const avatar = document.createElement("div");
+                avatar.className = "player-avatar";
+                avatar.textContent = avatarEmojis[index % avatarEmojis.length];
+                const name = document.createElement("span");
+                name.className = "player-name";
+                name.textContent = player.name + (player.rank === 1 ? " (winner)" : "");
+                info.append(avatar, name);
 
-                    item.append(medal, rank, info, score);
-                    leaderboard.appendChild(item);
-                });
-            } catch (error) {
-                console.error("Error displaying results:", error);
-                showMessage(leaderboard, "Error displaying results: " + error.message);
-            }
+                const score = document.createElement("span");
+                score.className = "score";
+                score.textContent = player.score + (player.score === 1 ? " point" : " points");
+
+                item.append(medal, rank, info, score);
+                leaderboard.appendChild(item);
+            });
         }
         
         function playAgain() {

@@ -69,6 +69,22 @@ def clean_player_name(name):
     return name or "Player"
 
 
+def rank_players(players):
+    """Sort players by score, highest first. Players with the same score share a rank (1, 1, 3).
+
+    Returns only names, scores and ranks, so player IDs aren't shown on the results page.
+    """
+    ordered = sorted(players.values(), key=lambda p: (-p["score"], p["name"].lower()))
+    ranked = []
+    for position, player in enumerate(ordered, start=1):
+        if ranked and player["score"] == ranked[-1]["score"]:
+            rank = ranked[-1]["rank"]
+        else:
+            rank = position
+        ranked.append({"name": player["name"], "score": player["score"], "rank": rank})
+    return ranked
+
+
 games = {}
 players = {}
 
@@ -358,14 +374,8 @@ def multiplayer_result(game_id):
     if not game:
         return redirect("/")
     
-    # Convert game object to dictionary for JSON serialization
-    game_dict = {
-        "game_id": game.game_id,
-        "players": game.players,
-        "started": game.started,
-        "finished": game.finished
-    }
-    return render_template("multiplayer_result.html", game=game_dict, game_id=game_id, questions=game.questions)
+    return render_template("multiplayer_result.html", game_id=game_id,
+                           ranked=rank_players(game.players))
 
 @socketio.on("create_game")
 def on_create_game(data):
