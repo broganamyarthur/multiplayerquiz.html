@@ -375,7 +375,13 @@ def on_join_game(data):
     players[player_id] = {"game_id": game_id, "name": player_name}
     
     join_room(game_id)
-    emit("player_joined", {"player_id": player_id, "player_name": player_name, "players": game.players}, to=game_id)
+    # Tell only the joining player their own ID...
+    emit("joined_game", {"game_id": game_id, "player_id": player_id,
+                         "player_name": game.players[player_id]["name"]})
+    # ...and tell everyone in the room the updated player list, without that ID,
+    # so other players' pages can't mistake it for their own.
+    emit("player_joined", {"player_name": game.players[player_id]["name"],
+                           "players": game.players}, to=game_id)
 
 @socketio.on("get_game_state")
 def on_get_game_state(data):

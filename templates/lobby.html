@@ -67,8 +67,8 @@
 
         socket.on("player_joined", function(data) {
             console.log("Player joined:", data);
-            playerId = data.player_id;
-            sessionStorage.setItem("playerId", playerId);
+            // Only update the player list. Each page keeps its own player ID,
+            // which was saved when this player created or joined the game.
             players = data.players;
             playerCount = Object.keys(players).length;
             updatePlayersList(players);
