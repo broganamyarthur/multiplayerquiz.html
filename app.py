@@ -70,6 +70,7 @@ class Game:
         self.finished = False
         self.answers = {}
         self.questions = load_questions()
+        self.colouring_bonuses = {}  # player ID -> question numbers already given a bonus
     
     def add_player(self, player_id, player_name):
         self.players[player_id] = {
@@ -78,26 +79,48 @@ class Game:
             "answers": {}
         }
     
-    def submit_answer(self, player_id, question_index, answer):
-        """Record a player's first answer to a question. Returns False if rejected."""
-        player = self.players.get(player_id)
-        if player is None:
-            app.logger.warning("Rejected answer from unknown player in game %s", self.game_id)
-            return False
-        valid_index = (
+    def is_valid_question_index(self, question_index):
+        """True if question_index is a whole number pointing at a real question."""
+        return (
             isinstance(question_index, int)
             and not isinstance(question_index, bool)
             and 0 <= question_index < len(self.questions)
         )
-        if not valid_index:
-            app.logger.warning("Rejected answer with invalid question index %r in game %s",
-                               question_index, self.game_id)
+
+    def find_player(self, player_id, question_index, action):
+        """Return the player if the player and question number are valid, otherwise log and return None."""
+        player = self.players.get(player_id)
+        if player is None:
+            app.logger.warning("Rejected %s from unknown player in game %s", action, self.game_id)
+            return None
+        if not self.is_valid_question_index(question_index):
+            app.logger.warning("Rejected %s with invalid question index %r in game %s",
+                               action, question_index, self.game_id)
+            return None
+        return player
+
+    def submit_answer(self, player_id, question_index, answer):
+        """Record a player's first answer to a question. Returns False if rejected."""
+        player = self.find_player(player_id, question_index, "answer")
+        if player is None:
             return False
         if question_index in player["answers"]:
             return False  # first answer stands
         player["answers"][question_index] = answer
         if answer == self.questions[question_index]["answer"]:
             player["score"] += 1
+        return True
+
+    def award_colouring_bonus(self, player_id, question_index):
+        """Give 1 bonus point the first time a player colours in the square for a question."""
+        player = self.find_player(player_id, question_index, "colouring bonus")
+        if player is None:
+            return False
+        already_given = self.colouring_bonuses.setdefault(player_id, set())
+        if question_index in already_given:
+            return False  # only one bonus per question
+        already_given.add(question_index)
+        player["score"] += 1
         return True
 
 @app.route("/")
@@ -390,6 +413,17 @@ def on_submit_answer(data):
     
     # Broadcast updated leaderboard to all players in game
     emit("leaderboard_update", {"players": game.players}, to=game_id)
+
+
+@socketio.on("colouring_complete")
+def on_colouring_complete(data):
+    """A player finished colouring in the square: give a bonus point once per question."""
+    game = games.get(data.get("game_id"))
+    if game is None:
+        emit("error", {"message": "Game not found"})
+        return
+    if game.award_colouring_bonus(data.get("player_id"), data.get("question_index")):
+        emit("leaderboard_update", {"players": game.players}, to=game.game_id)
 
 @socketio.on("finish_game")
 def on_finish_game(data):

@@ -43,3 +43,38 @@ def test_first_answer_stands_when_player_changes_their_answer(game):
 def test_invalid_answers_are_rejected_without_crashing(game, player_id, question_index):
     assert game.submit_answer(player_id, question_index, "anything") is False
     assert game.players["p1"]["score"] == 0
+
+
+def test_colouring_square_adds_one_bonus_point(game):
+    assert game.award_colouring_bonus("p1", 0) is True
+    assert game.players["p1"]["score"] == 1
+
+
+def test_colouring_same_question_twice_only_counts_once(game):
+    game.award_colouring_bonus("p1", 0)
+    assert game.award_colouring_bonus("p1", 0) is False
+    assert game.players["p1"]["score"] == 1
+
+
+def test_colouring_bonus_is_given_for_each_question(game):
+    game.award_colouring_bonus("p1", 0)
+    game.award_colouring_bonus("p1", 1)
+    assert game.players["p1"]["score"] == 2
+
+
+def test_colouring_bonus_adds_to_correct_answer(game):
+    game.submit_answer("p1", 0, game.questions[0]["answer"])
+    game.award_colouring_bonus("p1", 0)
+    assert game.players["p1"]["score"] == 2
+
+
+@pytest.mark.parametrize("player_id, question_index", [
+    ("nobody", 0),
+    ("p1", 999),
+    ("p1", -1),
+    ("p1", "zero"),
+    ("p1", None),
+])
+def test_invalid_colouring_bonus_is_rejected(game, player_id, question_index):
+    assert game.award_colouring_bonus(player_id, question_index) is False
+    assert game.players["p1"]["score"] == 0
